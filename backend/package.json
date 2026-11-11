@@ -1,0 +1,16 @@
+{
+  "name": "rwe-memories-backend",
+  "private": true,
+  "type": "module",
+  "description": "API for shared trip memories: MongoDB for the records, GridFS for the photos and videos.",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test \"test/*.test.js\""
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "firebase-admin": "^13.0.0",
+    "mongodb": "^6.12.0"
+  }
+}

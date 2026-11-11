@@ -1,0 +1,13 @@
+{
+  "name": "firebase-rules-tests",
+  "private": true,
+  "type": "module",
+  "description": "Tests of firestore.rules against the Firestore emulator.",
+  "scripts": {
+    "test": "cd .. && firebase emulators:exec --config firebase.emulator.json --only firestore --project demo-xp-rules \"cd firebase_tests && node firestore_xp_rules.test.mjs\""
+  },
+  "dependencies": {
+    "@firebase/rules-unit-testing": "^6.0.0",
+    "firebase": "^13.0.0"
+  }
+}

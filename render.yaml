@@ -1,0 +1,17 @@
+# Render blueprint for the memories API (see backend/README.md).
+services:
+  - type: web
+    name: rwe-memories
+    runtime: node
+    rootDir: backend
+    plan: free
+    buildCommand: npm install
+    startCommand: node server.js
+    healthCheckPath: /healthz
+    envVars:
+      - key: MONGODB_URI
+        sync: false # paste your Atlas connection string in the Render dashboard
+      - key: FIREBASE_PROJECT_ID
+        value: clone-2353a
+      - key: MEDIA_SECRET
+        generateValue: true

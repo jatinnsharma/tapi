@@ -1,0 +1,1652 @@
+[
+  {
+    "id": "new-delhi",
+    "name": "New Delhi",
+    "state": "Delhi",
+    "latitude": 28.6139,
+    "longitude": 77.209,
+    "blurb": "India's vibrant capital, packed with Mughal monuments, leafy boulevards, and bustling bazaars.",
+    "imageUrl": "https://images.unsplash.com/photo-1587474260584-136574528ed5?auto=format&fit=crop&w=800&q=80",
+    "category": "metropolis"
+  },
+  {
+    "id": "gurugram",
+    "name": "Gurugram",
+    "state": "Haryana",
+    "latitude": 28.4595,
+    "longitude": 77.0266,
+    "blurb": "Millennium city famous for gleaming skyscrapers, CyberHub nightlife, and Kingdom of Dreams.",
+    "imageUrl": "https://images.unsplash.com/photo-1596176530529-78163a4f7af2?auto=format&fit=crop&w=800&q=80",
+    "category": "urban"
+  },
+  {
+    "id": "chandigarh",
+    "name": "Chandigarh",
+    "state": "Chandigarh",
+    "latitude": 30.7333,
+    "longitude": 76.7794,
+    "blurb": "The City Beautiful, designed by Le Corbusier with serene gardens and wide tree-lined sectors.",
+    "imageUrl": "https://images.unsplash.com/photo-1622306915181-0a62451f2b6a?auto=format&fit=crop&w=800&q=80",
+    "category": "urban"
+  },
+  {
+    "id": "amritsar",
+    "name": "Amritsar",
+    "state": "Punjab",
+    "latitude": 31.634,
+    "longitude": 74.8723,
+    "blurb": "Home to the Golden Temple, legendary street food, and historic Punjabi heritage.",
+    "imageUrl": "https://images.unsplash.com/photo-1588096344356-9b497746765d?auto=format&fit=crop&w=800&q=80",
+    "category": "spiritual"
+  },
+  {
+    "id": "patiala",
+    "name": "Patiala",
+    "state": "Punjab",
+    "latitude": 30.3398,
+    "longitude": 76.3869,
+    "blurb": "Royal city of the Patiala peg, Qila Mubarak fortress, and Sheesh Mahal palace.",
+    "imageUrl": "https://images.unsplash.com/photo-1599661046289-e31897846e41?auto=format&fit=crop&w=800&q=80",
+    "category": "heritage"
+  },
+  {
+    "id": "anandpur-sahib",
+    "name": "Anandpur Sahib",
+    "state": "Punjab",
+    "latitude": 31.2389,
+    "longitude": 76.4996,
+    "blurb": "Holy city of bliss nestled in the Shivalik foothills, birthplace of the Khalsa.",
+    "imageUrl": "https://images.unsplash.com/photo-1600100397608-f010f443b71a?auto=format&fit=crop&w=800&q=80",
+    "category": "spiritual"
+  },
+  {
+    "id": "kurukshetra",
+    "name": "Kurukshetra",
+    "state": "Haryana",
+    "latitude": 29.9695,
+    "longitude": 76.8783,
+    "blurb": "Legendary battlefield of the Mahabharata and sacred birthplace of the Bhagavad Gita.",
+    "imageUrl": "https://images.unsplash.com/photo-1609137144813-7d9921338f24?auto=format&fit=crop&w=800&q=80",
+    "category": "spiritual"
+  },
+  {
+    "id": "srinagar",
+    "name": "Srinagar",
+    "state": "Jammu & Kashmir",
+    "latitude": 34.0837,
+    "longitude": 74.7973,
+    "blurb": "Paradise on Dal Lake with houseboats, Mughal gardens, and snow-draped Himalayan backdrops.",
+    "imageUrl": "https://images.unsplash.com/photo-1595815771614-ade9d652a65d?auto=format&fit=crop&w=800&q=80",
+    "category": "hill_station"
+  },
+  {
+    "id": "gulmarg",
+    "name": "Gulmarg",
+    "state": "Jammu & Kashmir",
+    "latitude": 34.0484,
+    "longitude": 74.3805,
+    "blurb": "Meadow of Flowers famous for Asia's highest gondola, world-class skiing, and alpine panoramas.",
+    "imageUrl": "https://images.unsplash.com/photo-1617868186608-87ae5c706244?auto=format&fit=crop&w=800&q=80",
+    "category": "adventure"
+  },
+  {
+    "id": "pahalgam",
+    "name": "Pahalgam",
+    "state": "Jammu & Kashmir",
+    "latitude": 34.0159,
+    "longitude": 75.3262,
+    "blurb": "Picturesque valley on the Lidder River, gateway to trekking routes and pine forests.",
+    "imageUrl": "https://images.unsplash.com/photo-1566837945700-30057527ade0?auto=format&fit=crop&w=800&q=80",
+    "category": "nature"
+  },
+  {
+    "id": "sonamarg",
+    "name": "Sonamarg",
+    "state": "Jammu & Kashmir",
+    "latitude": 34.3056,
+    "longitude": 75.2953,
+    "blurb": "Meadow of Gold featuring Thajiwas Glacier and roaring mountain streams.",
+    "imageUrl": "https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=800&q=80",
+    "category": "nature"
+  },
+  {
+    "id": "katra",
+    "name": "Katra (Vaishno Devi)",
+    "state": "Jammu & Kashmir",
+    "latitude": 32.9928,
+    "longitude": 74.9318,
+    "blurb": "Base camp for the sacred pilgrimage trek up Trikuta mountains to Mata Vaishno Devi.",
+    "imageUrl": "https://images.unsplash.com/photo-1616423640778-28d1b53229bd?auto=format&fit=crop&w=800&q=80",
+    "category": "spiritual"
+  },
+  {
+    "id": "leh",
+    "name": "Leh",
+    "state": "Ladakh",
+    "latitude": 34.1526,
+    "longitude": 77.5771,
+    "blurb": "High-altitude desert wonderland featuring ancient Tibetan monasteries and rugged passes.",
+    "imageUrl": "https://images.unsplash.com/photo-1581793745862-99fde7fa73d2?auto=format&fit=crop&w=800&q=80",
+    "category": "adventure"
+  },
+  {
+    "id": "nubra-valley",
+    "name": "Nubra Valley",
+    "state": "Ladakh",
+    "latitude": 34.6863,
+    "longitude": 77.5673,
+    "blurb": "Cold desert sand dunes, double-humped Bactrian camels, and dramatic Shyok river canyon.",
+    "imageUrl": "https://images.unsplash.com/photo-1598091383021-15ddea10925d?auto=format&fit=crop&w=800&q=80",
+    "category": "nature"
+  },
+  {
+    "id": "pangong-tso",
+    "name": "Pangong Tso",
+    "state": "Ladakh",
+    "latitude": 33.7595,
+    "longitude": 78.6674,
+    "blurb": "World's highest saltwater lake shifting colors from turquoise to deep indigo under barren crags.",
+    "imageUrl": "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80",
+    "category": "nature"
+  },
+  {
+    "id": "kargil",
+    "name": "Kargil",
+    "state": "Ladakh",
+    "latitude": 34.5539,
+    "longitude": 76.1349,
+    "blurb": "Suru valley town, historic trading crossroads on the Silk Road and heroic war memorial site.",
+    "imageUrl": "https://images.unsplash.com/photo-1517824806704-9040b037703b?auto=format&fit=crop&w=800&q=80",
+    "category": "adventure"
+  },
+  {
+    "id": "shimla",
+    "name": "Shimla",
+    "state": "Himachal Pradesh",
+    "latitude": 31.1048,
+    "longitude": 77.1734,
+    "blurb": "Colonial summer capital nestled on cedar ridges with the historic Mall Road and toy train.",
+    "imageUrl": "https://images.unsplash.com/photo-1597074866923-dc0589150358?auto=format&fit=crop&w=800&q=80",
+    "category": "hill_station"
+  },
+  {
+    "id": "manali",
+    "name": "Manali",
+    "state": "Himachal Pradesh",
+    "latitude": 32.2432,
+    "longitude": 77.1892,
+    "blurb": "Adventure hub of the Beas Valley with Rohtang Pass, Solang activities, and cozy Old Manali cafes.",
+    "imageUrl": "https://images.unsplash.com/photo-1605649487212-47bdab064df7?auto=format&fit=crop&w=800&q=80",
+    "category": "adventure"
+  },
+  {
+    "id": "dharamshala",
+    "name": "Dharamshala & McLeod Ganj",
+    "state": "Himachal Pradesh",
+    "latitude": 32.219,
+    "longitude": 76.3234,
+    "blurb": "Little Lhasa perched beneath the Dhauladhar range, residence of the Dalai Lama.",
+    "imageUrl": "https://images.unsplash.com/photo-1626621341517-bbf3d9990a23?auto=format&fit=crop&w=800&q=80",
+    "category": "spiritual"
+  },
+  {
+    "id": "kasol",
+    "name": "Kasol",
+    "state": "Himachal Pradesh",
+    "latitude": 32.01,
+    "longitude": 77.315,
+    "blurb": "Backpacker haven in Parvati Valley surrounded by towering pines and scenic mountain trails.",
+    "imageUrl": "https://images.unsplash.com/photo-1605647540924-852290f6b0d5?auto=format&fit=crop&w=800&q=80",
+    "category": "nature"
+  },
+  {
+    "id": "spiti-valley",
+    "name": "Spiti Valley (Kaza)",
+    "state": "Himachal Pradesh",
+    "latitude": 32.2276,
+    "longitude": 78.071,
+    "blurb": "Middle Land of barren moonscapes, ancient thousand-year-old Key gompa, and turquoise rivers.",
+    "imageUrl": "https://images.unsplash.com/photo-1571401835393-8c5f35328320?auto=format&fit=crop&w=800&q=80",
+    "category": "adventure"
+  },
+  {
+    "id": "dalhousie",
+    "name": "Dalhousie & Khajjiar",
+    "state": "Himachal Pradesh",
+    "latitude": 32.5387,
+    "longitude": 75.971,
+    "blurb": "Tranquil hill station framed by five pine-clad hills and neighboring Khajjiar's mini Switzerland.",
+    "imageUrl": "https://images.unsplash.com/photo-1596401057633-54a8fe8ef647?auto=format&fit=crop&w=800&q=80",
+    "category": "hill_station"
+  },
+  {
+    "id": "bir-billing",
+    "name": "Bir Billing",
+    "state": "Himachal Pradesh",
+    "latitude": 32.0427,
+    "longitude": 76.7166,
+    "blurb": "World's top paragliding destination coupled with Tibetan settlements and peaceful tea gardens.",
+    "imageUrl": "https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=800&q=80",
+    "category": "adventure"
+  },
+  {
+    "id": "kasauli",
+    "name": "Kasauli",
+    "state": "Himachal Pradesh",
+    "latitude": 30.9013,
+    "longitude": 76.9649,
+    "blurb": "Quiet cantonment hill retreat with Gilbert Nature Trail, sunset views, and colonial churches.",
+    "imageUrl": "https://images.unsplash.com/photo-1511497584788-87676104235f?auto=format&fit=crop&w=800&q=80",
+    "category": "hill_station"
+  },
+  {
+    "id": "tirthan-valley",
+    "name": "Tirthan Valley",
+    "state": "Himachal Pradesh",
+    "latitude": 31.6433,
+    "longitude": 77.3456,
+    "blurb": "Untouched gateway to Great Himalayan National Park, famous for trout fishing and pine forests.",
+    "imageUrl": "https://images.unsplash.com/photo-1544735716-392fe2489ffa?auto=format&fit=crop&w=800&q=80",
+    "category": "nature"
+  },
+  {
+    "id": "kinnaur",
+    "name": "Kinnaur (Kalpa & Chitkul)",
+    "state": "Himachal Pradesh",
+    "latitude": 31.5385,
+    "longitude": 78.2562,
+    "blurb": "Apple orchard valleys, Kinner Kailash peak views, and Chitkul, India's last inhabited village.",
+    "imageUrl": "https://images.unsplash.com/photo-1517824806704-9040b037703b?auto=format&fit=crop&w=800&q=80",
+    "category": "adventure"
+  },
+  {
+    "id": "rishikesh",
+    "name": "Rishikesh",
+    "state": "Uttarakhand",
+    "latitude": 30.0869,
+    "longitude": 78.2676,
+    "blurb": "Yoga capital of the world on the emerald Ganges with white-water rafting and suspension bridges.",
+    "imageUrl": "https://images.unsplash.com/photo-1602216056096-3b40cc0c9944?auto=format&fit=crop&w=800&q=80",
+    "category": "spiritual"
+  },
+  {
+    "id": "haridwar",
+    "name": "Haridwar",
+    "state": "Uttarakhand",
+    "latitude": 29.9457,
+    "longitude": 78.1642,
+    "blurb": "Sacred gateway where the holy Ganges leaves the mountains; renowned for Har Ki Pauri Ganga Aarti.",
+    "imageUrl": "https://images.unsplash.com/photo-1590050752117-238cb0fb12b1?auto=format&fit=crop&w=800&q=80",
+    "category": "spiritual"
+  },
+  {
+    "id": "dehradun",
+    "name": "Dehradun",
+    "state": "Uttarakhand",
+    "latitude": 30.3165,
+    "longitude": 78.0322,
+    "blurb": "Scenic valley city nestled between the Himalayas and Shivaliks, known for premier institutions.",
+    "imageUrl": "https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=800&q=80",
+    "category": "hill_station"
+  },
+  {
+    "id": "mussoorie",
+    "name": "Mussoorie",
+    "state": "Uttarakhand",
+    "latitude": 30.4598,
+    "longitude": 78.0644,
+    "blurb": "Queen of the Hills offering dramatic views of the Doon Valley and snowcapped Garhwal peaks.",
+    "imageUrl": "https://images.unsplash.com/photo-1589308078059-be1415eab4c3?auto=format&fit=crop&w=800&q=80",
+    "category": "hill_station"
+  },
+  {
+    "id": "nainital",
+    "name": "Nainital",
+    "state": "Uttarakhand",
+    "latitude": 29.3919,
+    "longitude": 79.4542,
+    "blurb": "Famous lake town set in an emerald basin around Naini Lake, enveloped by oak and pine ridges.",
+    "imageUrl": "https://images.unsplash.com/photo-1596707328570-5b65103d1591?auto=format&fit=crop&w=800&q=80",
+    "category": "hill_station"
+  },
+  {
+    "id": "auli",
+    "name": "Auli",
+    "state": "Uttarakhand",
+    "latitude": 30.5317,
+    "longitude": 79.567,
+    "blurb": "Premier Himalayan ski resort showcasing breathtaking 180-degree views of Nanda Devi peak.",
+    "imageUrl": "https://images.unsplash.com/photo-1517824806704-9040b037703b?auto=format&fit=crop&w=800&q=80",
+    "category": "adventure"
+  },
+  {
+    "id": "corbett",
+    "name": "Jim Corbett National Park",
+    "state": "Uttarakhand",
+    "latitude": 29.53,
+    "longitude": 78.7747,
+    "blurb": "India's oldest national park, legendary home of the Royal Bengal tiger along the Ramganga River.",
+    "imageUrl": "https://images.unsplash.com/photo-1561731216-c3a4d99437d5?auto=format&fit=crop&w=800&q=80",
+    "category": "nature"
+  },
+  {
+    "id": "kedarnath",
+    "name": "Kedarnath",
+    "state": "Uttarakhand",
+    "latitude": 30.7346,
+    "longitude": 79.0669,
+    "blurb": "Ancient shrine of Lord Shiva located at 11,755 feet against majestic Kedarnath mountain glaciers.",
+    "imageUrl": "https://images.unsplash.com/photo-1600100397608-f010f443b71a?auto=format&fit=crop&w=800&q=80",
+    "category": "spiritual"
+  },
+  {
+    "id": "badrinath",
+    "name": "Badrinath",
+    "state": "Uttarakhand",
+    "latitude": 30.7433,
+    "longitude": 79.4938,
+    "blurb": "Sacred Char Dham shrine dedicated to Lord Vishnu, situated between Nar and Narayana ranges.",
+    "imageUrl": "https://images.unsplash.com/photo-1600100397608-f010f443b71a?auto=format&fit=crop&w=800&q=80",
+    "category": "spiritual"
+  },
+  {
+    "id": "chopta",
+    "name": "Chopta & Tungnath",
+    "state": "Uttarakhand",
+    "latitude": 30.4853,
+    "longitude": 79.1764,
+    "blurb": "Mini Switzerland of Uttarakhand and base for the trek to Tungnath, highest Shiva temple in the world.",
+    "imageUrl": "https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=800&q=80",
+    "category": "adventure"
+  },
+  {
+    "id": "ranikhet",
+    "name": "Ranikhet",
+    "state": "Uttarakhand",
+    "latitude": 29.6434,
+    "longitude": 79.4322,
+    "blurb": "Queen's meadow cantonment adorned with pine forests, fruit orchards, and Kumaon Himalayan views.",
+    "imageUrl": "https://images.unsplash.com/photo-1511497584788-87676104235f?auto=format&fit=crop&w=800&q=80",
+    "category": "hill_station"
+  },
+  {
+    "id": "lansdowne",
+    "name": "Lansdowne",
+    "state": "Uttarakhand",
+    "latitude": 29.8377,
+    "longitude": 78.6874,
+    "blurb": "Unspoiled and quiet Garhwal hill town home to the Garhwal Rifles regiment center.",
+    "imageUrl": "https://images.unsplash.com/photo-1596401057633-54a8fe8ef647?auto=format&fit=crop&w=800&q=80",
+    "category": "hill_station"
+  },
+  {
+    "id": "varanasi",
+    "name": "Varanasi",
+    "state": "Uttar Pradesh",
+    "latitude": 25.3176,
+    "longitude": 82.9739,
+    "blurb": "One of the world's oldest living cities, celebrated for sacred river ghats and mystical twilight aartis.",
+    "imageUrl": "https://images.unsplash.com/photo-1561361513-2d000a50f0dc?auto=format&fit=crop&w=800&q=80",
+    "category": "spiritual"
+  },
+  {
+    "id": "agra",
+    "name": "Agra",
+    "state": "Uttar Pradesh",
+    "latitude": 27.1767,
+    "longitude": 78.0081,
+    "blurb": "City of the immortal Taj Mahal, Agra Fort, and rich Mughal architectural masterpieces.",
+    "imageUrl": "https://images.unsplash.com/photo-1564507592333-c60657eea523?auto=format&fit=crop&w=800&q=80",
+    "category": "heritage"
+  },
+  {
+    "id": "lucknow",
+    "name": "Lucknow",
+    "state": "Uttar Pradesh",
+    "latitude": 26.8467,
+    "longitude": 80.9462,
+    "blurb": "City of Nawabs celebrated for Awadhi kebabs, Chikankari embroidery, and Bara Imambara.",
+    "imageUrl": "https://images.unsplash.com/photo-1588714477688-cf28a50e94f7?auto=format&fit=crop&w=800&q=80",
+    "category": "heritage"
+  },
+  {
+    "id": "ayodhya",
+    "name": "Ayodhya",
+    "state": "Uttar Pradesh",
+    "latitude": 26.7922,
+    "longitude": 82.1998,
+    "blurb": "Ancient holy birthplace of Lord Rama on the banks of the Sarayu River, dotted with temples.",
+    "imageUrl": "https://images.unsplash.com/photo-1616423640778-28d1b53229bd?auto=format&fit=crop&w=800&q=80",
+    "category": "spiritual"
+  },
+  {
+    "id": "prayagraj",
+    "name": "Prayagraj",
+    "state": "Uttar Pradesh",
+    "latitude": 25.4358,
+    "longitude": 81.8463,
+    "blurb": "Holy Triveni Sangam confluence of Ganges, Yamuna, and mythical Saraswati, host to Kumbh Mela.",
+    "imageUrl": "https://images.unsplash.com/photo-1609137144813-7d9921338f24?auto=format&fit=crop&w=800&q=80",
+    "category": "spiritual"
+  },
+  {
+    "id": "mathura",
+    "name": "Mathura & Vrindavan",
+    "state": "Uttar Pradesh",
+    "latitude": 27.4924,
+    "longitude": 77.6737,
+    "blurb": "Sacred birthplace of Lord Krishna along the Yamuna, vibrant with ancient temples and festive joy.",
+    "imageUrl": "https://images.unsplash.com/photo-1600100397608-f010f443b71a?auto=format&fit=crop&w=800&q=80",
+    "category": "spiritual"
+  },
+  {
+    "id": "fatehpur-sikri",
+    "name": "Fatehpur Sikri",
+    "state": "Uttar Pradesh",
+    "latitude": 27.0945,
+    "longitude": 77.6679,
+    "blurb": "Akbar's magnificent red sandstone Mughal capital featuring Buland Darwaza and Salim Chishti tomb.",
+    "imageUrl": "https://images.unsplash.com/photo-1599661046289-e31897846e41?auto=format&fit=crop&w=800&q=80",
+    "category": "heritage"
+  },
+  {
+    "id": "sarnath",
+    "name": "Sarnath",
+    "state": "Uttar Pradesh",
+    "latitude": 25.3811,
+    "longitude": 83.0214,
+    "blurb": "Deer Park where Lord Buddha delivered his first sermon; site of the Ashoka Pillar and Dhamek Stupa.",
+    "imageUrl": "https://images.unsplash.com/photo-1599571234909-29ed5d1321d6?auto=format&fit=crop&w=800&q=80",
+    "category": "spiritual"
+  },
+  {
+    "id": "bodh-gaya",
+    "name": "Bodh Gaya",
+    "state": "Bihar",
+    "latitude": 24.6961,
+    "longitude": 84.9869,
+    "blurb": "Revered Buddhist pilgrimage site where Siddhartha Gautama attained enlightenment beneath the Bodhi tree.",
+    "imageUrl": "https://images.unsplash.com/photo-1599571234909-29ed5d1321d6?auto=format&fit=crop&w=800&q=80",
+    "category": "spiritual"
+  },
+  {
+    "id": "nalanda",
+    "name": "Nalanda & Rajgir",
+    "state": "Bihar",
+    "latitude": 25.1357,
+    "longitude": 85.4435,
+    "blurb": "Ruins of the legendary ancient university and Rajgir's Vulture's Peak with Japanese Peace Pagoda.",
+    "imageUrl": "https://images.unsplash.com/photo-1544735716-392fe2489ffa?auto=format&fit=crop&w=800&q=80",
+    "category": "heritage"
+  },
+  {
+    "id": "patna",
+    "name": "Patna",
+    "state": "Bihar",
+    "latitude": 25.5941,
+    "longitude": 85.1376,
+    "blurb": "Historic Pataliputra on the Ganges, housing Takht Sri Patna Sahib and Golghar granary.",
+    "imageUrl": "https://images.unsplash.com/photo-1574958269340-fa927503f3dd?auto=format&fit=crop&w=800&q=80",
+    "category": "urban"
+  },
+  {
+    "id": "ranchi",
+    "name": "Ranchi",
+    "state": "Jharkhand",
+    "latitude": 23.3441,
+    "longitude": 85.3096,
+    "blurb": "City of Waterfalls with Hundru, Dassam, and Jonha falls set amidst Chota Nagpur plateau forests.",
+    "imageUrl": "https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=800&q=80",
+    "category": "nature"
+  },
+  {
+    "id": "jaipur",
+    "name": "Jaipur",
+    "state": "Rajasthan",
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "blurb": "The Pink City, famed for Hawa Mahal, colossal Amber Fort, royal palaces, and jewelry bazaars.",
+    "imageUrl": "https://images.unsplash.com/photo-1599661046289-e31897846e41?auto=format&fit=crop&w=800&q=80",
+    "category": "heritage"
+  },
+  {
+    "id": "udaipur",
+    "name": "Udaipur",
+    "state": "Rajasthan",
+    "latitude": 24.5854,
+    "longitude": 73.7125,
+    "blurb": "City of Lakes and romance, adorned with white marble palaces floating upon Lake Pichola.",
+    "imageUrl": "https://images.unsplash.com/photo-1615836245337-f5b9b2303f10?auto=format&fit=crop&w=800&q=80",
+    "category": "heritage"
+  },
+  {
+    "id": "jodhpur",
+    "name": "Jodhpur",
+    "state": "Rajasthan",
+    "latitude": 26.2389,
+    "longitude": 73.0243,
+    "blurb": "The Sun City, crowned by the mighty Mehrangarh Fort towering above an ocean of indigo blue houses.",
+    "imageUrl": "https://images.unsplash.com/photo-1512343879784-a960bf40e7f2?auto=format&fit=crop&w=800&q=80",
+    "category": "heritage"
+  },
+  {
+    "id": "jaisalmer",
+    "name": "Jaisalmer",
+    "state": "Rajasthan",
+    "latitude": 26.9157,
+    "longitude": 70.9083,
+    "blurb": "The Golden City rising from Thar desert sands, with an inhabited living fort and golden dunes.",
+    "imageUrl": "https://images.unsplash.com/photo-1572979240412-a725170366eb?auto=format&fit=crop&w=800&q=80",
+    "category": "heritage"
+  },
+  {
+    "id": "pushkar",
+    "name": "Pushkar & Ajmer",
+    "state": "Rajasthan",
+    "latitude": 26.4897,
+    "longitude": 74.5511,
+    "blurb": "Spiritual oasis surrounding a sacred holy lake, near the reverent Sufi shrine Ajmer Sharif.",
+    "imageUrl": "https://images.unsplash.com/photo-1582510003544-4d00b7f74220?auto=format&fit=crop&w=800&q=80",
+    "category": "spiritual"
+  },
+  {
+    "id": "ranthambore",
+    "name": "Ranthambore (Sawai Madhopur)",
+    "state": "Rajasthan",
+    "latitude": 26.0173,
+    "longitude": 76.5026,
+    "blurb": "Legendary tiger sanctuary where wild Royal Bengal tigers prowl amongst ancient fort ruins.",
+    "imageUrl": "https://images.unsplash.com/photo-1534567153574-2b12153a87f0?auto=format&fit=crop&w=800&q=80",
+    "category": "nature"
+  },
+  {
+    "id": "mount-abu",
+    "name": "Mount Abu",
+    "state": "Rajasthan",
+    "latitude": 24.5926,
+    "longitude": 72.7156,
+    "blurb": "Only hill station in Rajasthan, celebrated for exquisite marble carvings at Dilwara Jain Temples.",
+    "imageUrl": "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80",
+    "category": "hill_station"
+  },
+  {
+    "id": "bikaner",
+    "name": "Bikaner",
+    "state": "Rajasthan",
+    "latitude": 28.0229,
+    "longitude": 73.3119,
+    "blurb": "Desert realm of Junagarh Fort, Lalgarh Palace, and authentic Rajasthani bhujia and sweets.",
+    "imageUrl": "https://images.unsplash.com/photo-1599661046289-e31897846e41?auto=format&fit=crop&w=800&q=80",
+    "category": "heritage"
+  },
+  {
+    "id": "chittorgarh",
+    "name": "Chittorgarh",
+    "state": "Rajasthan",
+    "latitude": 24.8887,
+    "longitude": 74.6269,
+    "blurb": "Symbol of Rajput valor and sacrifice, featuring India's largest hilltop fort complex.",
+    "imageUrl": "https://images.unsplash.com/photo-1599661046289-e31897846e41?auto=format&fit=crop&w=800&q=80",
+    "category": "heritage"
+  },
+  {
+    "id": "kumbhalgarh",
+    "name": "Kumbhalgarh",
+    "state": "Rajasthan",
+    "latitude": 25.1479,
+    "longitude": 73.5872,
+    "blurb": "Mewar hill fortress boasting the Great Wall of India, second longest continuous wall in the world.",
+    "imageUrl": "https://images.unsplash.com/photo-1599661046289-e31897846e41?auto=format&fit=crop&w=800&q=80",
+    "category": "heritage"
+  },
+  {
+    "id": "ahmedabad",
+    "name": "Ahmedabad",
+    "state": "Gujarat",
+    "latitude": 23.0225,
+    "longitude": 72.5714,
+    "blurb": "India's first UNESCO World Heritage City with Sabarmati Ashram, intricately carved stepwells, and street food.",
+    "imageUrl": "https://images.unsplash.com/photo-1608958435020-e8a7109ba809?auto=format&fit=crop&w=800&q=80",
+    "category": "heritage"
+  },
+  {
+    "id": "rann-of-kutch",
+    "name": "Rann of Kutch (Bhuj)",
+    "state": "Gujarat",
+    "latitude": 23.8344,
+    "longitude": 69.8389,
+    "blurb": "Vast endless white salt desert illuminated under full moon nights, celebrated during Rann Utsav.",
+    "imageUrl": "https://images.unsplash.com/photo-1620078278772-c2e39922e960?auto=format&fit=crop&w=800&q=80",
+    "category": "nature"
+  },
+  {
+    "id": "gir",
+    "name": "Gir National Park",
+    "state": "Gujarat",
+    "latitude": 21.1243,
+    "longitude": 70.8242,
+    "blurb": "The world's only natural sanctuary and habitat of the majestic Asiatic Lion.",
+    "imageUrl": "https://images.unsplash.com/photo-1546182990-dffeafbe841d?auto=format&fit=crop&w=800&q=80",
+    "category": "nature"
+  },
+  {
+    "id": "dwarka",
+    "name": "Dwarka",
+    "state": "Gujarat",
+    "latitude": 22.2442,
+    "longitude": 68.9685,
+    "blurb": "Ancient coastal kingdom of Lord Krishna, one of the four sacred Char Dham pilgrimage shrines.",
+    "imageUrl": "https://images.unsplash.com/photo-1548013146-72479768bada?auto=format&fit=crop&w=800&q=80",
+    "category": "spiritual"
+  },
+  {
+    "id": "somnath",
+    "name": "Somnath",
+    "state": "Gujarat",
+    "latitude": 20.888,
+    "longitude": 70.4012,
+    "blurb": "First among the twelve sacred Jyotirlinga shrines, standing resolutely against crashing Arabian Sea waves.",
+    "imageUrl": "https://images.unsplash.com/photo-1609137144813-7d9921338f24?auto=format&fit=crop&w=800&q=80",
+    "category": "spiritual"
+  },
+  {
+    "id": "statue-of-unity",
+    "name": "Statue of Unity (Kevadia)",
+    "state": "Gujarat",
+    "latitude": 21.838,
+    "longitude": 73.7191,
+    "blurb": "World's tallest statue standing 182 meters high on the Narmada River, honoring Sardar Patel.",
+    "imageUrl": "https://images.unsplash.com/photo-1587474260584-136574528ed5?auto=format&fit=crop&w=800&q=80",
+    "category": "heritage"
+  },
+  {
+    "id": "vadodara",
+    "name": "Vadodara",
+    "state": "Gujarat",
+    "latitude": 22.3072,
+    "longitude": 73.1812,
+    "blurb": "Cultural capital of Gujarat showcasing the opulent Laxmi Vilas Palace and rich arts heritage.",
+    "imageUrl": "https://images.unsplash.com/photo-1599661046289-e31897846e41?auto=format&fit=crop&w=800&q=80",
+    "category": "heritage"
+  },
+  {
+    "id": "bhopal",
+    "name": "Bhopal & Sanchi",
+    "state": "Madhya Pradesh",
+    "latitude": 23.2599,
+    "longitude": 77.4126,
+    "blurb": "City of Lakes surrounded by UNESCO Great Stupa of Sanchi and prehistoric Bhimbetka caves.",
+    "imageUrl": "https://images.unsplash.com/photo-1600100397608-f010f443b71a?auto=format&fit=crop&w=800&q=80",
+    "category": "heritage"
+  },
+  {
+    "id": "indore",
+    "name": "Indore",
+    "state": "Madhya Pradesh",
+    "latitude": 22.7196,
+    "longitude": 75.8577,
+    "blurb": "Cleanest city in India and street food paradise renowned for Sarafa Bazaar's midnight food market.",
+    "imageUrl": "https://images.unsplash.com/photo-1596707328570-5b65103d1591?auto=format&fit=crop&w=800&q=80",
+    "category": "urban"
+  },
+  {
+    "id": "ujjain",
+    "name": "Ujjain",
+    "state": "Madhya Pradesh",
+    "latitude": 23.1765,
+    "longitude": 75.7885,
+    "blurb": "Ancient holy city on the Shipra River, home to Mahakaleshwar Jyotirlinga and the grand Mahakal Lok.",
+    "imageUrl": "https://images.unsplash.com/photo-1616423640778-28d1b53229bd?auto=format&fit=crop&w=800&q=80",
+    "category": "spiritual"
+  },
+  {
+    "id": "gwalior",
+    "name": "Gwalior",
+    "state": "Madhya Pradesh",
+    "latitude": 26.2183,
+    "longitude": 78.1828,
+    "blurb": "Historic fortress city boasting one of India's most impregnable hill forts and Scindia palaces.",
+    "imageUrl": "https://images.unsplash.com/photo-1599661046289-e31897846e41?auto=format&fit=crop&w=800&q=80",
+    "category": "heritage"
+  },
+  {
+    "id": "khajuraho",
+    "name": "Khajuraho",
+    "state": "Madhya Pradesh",
+    "latitude": 24.8318,
+    "longitude": 79.9199,
+    "blurb": "UNESCO World Heritage site world-renowned for stunning medieval Hindu and Jain sculptural stone art.",
+    "imageUrl": "https://images.unsplash.com/photo-1600100397608-f010f443b71a?auto=format&fit=crop&w=800&q=80",
+    "category": "heritage"
+  },
+  {
+    "id": "orchha",
+    "name": "Orchha",
+    "state": "Madhya Pradesh",
+    "latitude": 25.3516,
+    "longitude": 78.6416,
+    "blurb": "Hidden medieval town on the Betwa River filled with riverside chhatris and fort palaces.",
+    "imageUrl": "https://images.unsplash.com/photo-1588714477688-cf28a50e94f7?auto=format&fit=crop&w=800&q=80",
+    "category": "heritage"
+  },
+  {
+    "id": "jabalpur",
+    "name": "Jabalpur (Bhedaghat)",
+    "state": "Madhya Pradesh",
+    "latitude": 23.1815,
+    "longitude": 79.9864,
+    "blurb": "Dhuandhar falls and soaring white marble rocks carved by the sacred Narmada gorge.",
+    "imageUrl": "https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=800&q=80",
+    "category": "nature"
+  },
+  {
+    "id": "kanha",
+    "name": "Kanha & Bandhavgarh",
+    "state": "Madhya Pradesh",
+    "latitude": 22.3345,
+    "longitude": 80.6115,
+    "blurb": "The wild heart of India that inspired Kipling's Jungle Book, harboring prime tiger habitats.",
+    "imageUrl": "https://images.unsplash.com/photo-1534567153574-2b12153a87f0?auto=format&fit=crop&w=800&q=80",
+    "category": "nature"
+  },
+  {
+    "id": "pachmarhi",
+    "name": "Pachmarhi",
+    "state": "Madhya Pradesh",
+    "latitude": 22.4674,
+    "longitude": 78.4346,
+    "blurb": "Queen of the Satpuras hill station surrounded by waterfalls, ravines, and prehistoric cave paintings.",
+    "imageUrl": "https://images.unsplash.com/photo-1511497584788-87676104235f?auto=format&fit=crop&w=800&q=80",
+    "category": "hill_station"
+  },
+  {
+    "id": "mumbai",
+    "name": "Mumbai",
+    "state": "Maharashtra",
+    "latitude": 18.922,
+    "longitude": 72.8347,
+    "blurb": "City of Dreams with the iconic Gateway of India, Marine Drive promenade, Bollywood, and coastal energy.",
+    "imageUrl": "https://images.unsplash.com/photo-1570168007204-dfb528c6958f?auto=format&fit=crop&w=800&q=80",
+    "category": "metropolis"
+  },
+  {
+    "id": "pune",
+    "name": "Pune",
+    "state": "Maharashtra",
+    "latitude": 18.5204,
+    "longitude": 73.8567,
+    "blurb": "Cultural capital of Maharashtra, bustling with academic hubs, Maratha history, and cafe culture.",
+    "imageUrl": "https://images.unsplash.com/photo-1574958269340-fa927503f3dd?auto=format&fit=crop&w=800&q=80",
+    "category": "urban"
+  },
+  {
+    "id": "lonavala",
+    "name": "Lonavala & Khandala",
+    "state": "Maharashtra",
+    "latitude": 18.7557,
+    "longitude": 73.4091,
+    "blurb": "Popular Sahyadri hill retreat with misty monsoon waterfalls, Tiger Point cliff, and ancient Karla Caves.",
+    "imageUrl": "https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=800&q=80",
+    "category": "hill_station"
+  },
+  {
+    "id": "mahabaleshwar",
+    "name": "Mahabaleshwar & Panchgani",
+    "state": "Maharashtra",
+    "latitude": 17.9237,
+    "longitude": 73.6586,
+    "blurb": "Strawberry capital in the Western Ghats with panoramic cliff viewpoints and Arthur's Seat.",
+    "imageUrl": "https://images.unsplash.com/photo-1511497584788-87676104235f?auto=format&fit=crop&w=800&q=80",
+    "category": "hill_station"
+  },
+  {
+    "id": "nashik",
+    "name": "Nashik",
+    "state": "Maharashtra",
+    "latitude": 19.9975,
+    "longitude": 73.7898,
+    "blurb": "Wine capital of India along the Godavari River, featuring lush vineyards and Trimbakeshwar shrine.",
+    "imageUrl": "https://images.unsplash.com/photo-1506377247377-2a5b3b417ebb?auto=format&fit=crop&w=800&q=80",
+    "category": "heritage"
+  },
+  {
+    "id": "shirdi",
+    "name": "Shirdi",
+    "state": "Maharashtra",
+    "latitude": 19.7667,
+    "longitude": 74.4767,
+    "blurb": "Sacred pilgrimage abode of the saint Sai Baba, welcoming millions of devotees each year.",
+    "imageUrl": "https://images.unsplash.com/photo-1600100397608-f010f443b71a?auto=format&fit=crop&w=800&q=80",
+    "category": "spiritual"
+  },
+  {
+    "id": "chhatrapati-sambhajinagar",
+    "name": "Chhatrapati Sambhajinagar (Aurangabad)",
+    "state": "Maharashtra",
+    "latitude": 19.8762,
+    "longitude": 75.3433,
+    "blurb": "Gateway to the breathtaking rock-cut Ajanta and Ellora UNESCO caves and the historic Bibi Ka Maqbara.",
+    "imageUrl": "https://images.unsplash.com/photo-1599661046289-e31897846e41?auto=format&fit=crop&w=800&q=80",
+    "category": "heritage"
+  },
+  {
+    "id": "alibaug",
+    "name": "Alibaug",
+    "state": "Maharashtra",
+    "latitude": 18.6414,
+    "longitude": 72.8722,
+    "blurb": "Konkan coastal getaway accessible by ferry from Mumbai, featuring sea forts and quiet beaches.",
+    "imageUrl": "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80",
+    "category": "beach"
+  },
+  {
+    "id": "matheran",
+    "name": "Matheran",
+    "state": "Maharashtra",
+    "latitude": 18.9866,
+    "longitude": 73.268,
+    "blurb": "Asia's only automobile-free hill station, preserved with red mud trails and scenic lookout cliffs.",
+    "imageUrl": "https://images.unsplash.com/photo-1511497584788-87676104235f?auto=format&fit=crop&w=800&q=80",
+    "category": "hill_station"
+  },
+  {
+    "id": "tarkarli",
+    "name": "Tarkarli & Malvan",
+    "state": "Maharashtra",
+    "latitude": 16.0356,
+    "longitude": 73.4925,
+    "blurb": "Pristine southern Konkan coastline famous for scuba diving, Sindhudurg island fort, and Malvani cuisine.",
+    "imageUrl": "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80",
+    "category": "beach"
+  },
+  {
+    "id": "goa-panaji",
+    "name": "Panaji (Goa)",
+    "state": "Goa",
+    "latitude": 15.4909,
+    "longitude": 73.8278,
+    "blurb": "Charming capital of Goa filled with colorful Portuguese quarters in Fontainhas and river cruises.",
+    "imageUrl": "https://images.unsplash.com/photo-1512343879784-a960bf40e7f2?auto=format&fit=crop&w=800&q=80",
+    "category": "coastal"
+  },
+  {
+    "id": "north-goa",
+    "name": "North Goa",
+    "state": "Goa",
+    "latitude": 15.5494,
+    "longitude": 73.7535,
+    "blurb": "Electric beach destinations like Anjuna, Vagator and Calangute with sunset shacks and water sports.",
+    "imageUrl": "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80",
+    "category": "beach"
+  },
+  {
+    "id": "south-goa",
+    "name": "South Goa",
+    "state": "Goa",
+    "latitude": 15.2832,
+    "longitude": 73.9862,
+    "blurb": "Serene white sand shores of Palolem, Agonda, and Colva, perfect for laid-back tropical relaxation.",
+    "imageUrl": "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80",
+    "category": "beach"
+  },
+  {
+    "id": "bengaluru",
+    "name": "Bengaluru",
+    "state": "Karnataka",
+    "latitude": 12.9716,
+    "longitude": 77.5946,
+    "blurb": "Silicon Valley of India with Cubbon Park, craft breweries, vibrant art scenes, and pleasant weather.",
+    "imageUrl": "https://images.unsplash.com/photo-1596176530529-78163a4f7af2?auto=format&fit=crop&w=800&q=80",
+    "category": "metropolis"
+  },
+  {
+    "id": "mysuru",
+    "name": "Mysuru",
+    "state": "Karnataka",
+    "latitude": 12.2958,
+    "longitude": 76.6394,
+    "blurb": "Heritage city of grand Mysore Palace illuminated by thousands of bulbs, silk sarees, and sandalwood.",
+    "imageUrl": "https://images.unsplash.com/photo-1600100397608-f010f443b71a?auto=format&fit=crop&w=800&q=80",
+    "category": "heritage"
+  },
+  {
+    "id": "hampi",
+    "name": "Hampi",
+    "state": "Karnataka",
+    "latitude": 15.335,
+    "longitude": 76.46,
+    "blurb": "UNESCO-listed boulder strewn open-air museum preserving ruins of the great Vijayanagara Empire.",
+    "imageUrl": "https://images.unsplash.com/photo-1600100397608-f010f443b71a?auto=format&fit=crop&w=800&q=80",
+    "category": "heritage"
+  },
+  {
+    "id": "coorg",
+    "name": "Coorg (Madikeri)",
+    "state": "Karnataka",
+    "latitude": 12.4244,
+    "longitude": 75.7382,
+    "blurb": "Scotland of India with lush coffee plantations, spice hills, misty Abbey Falls, and Kodava culture.",
+    "imageUrl": "https://images.unsplash.com/photo-1544735716-392fe2489ffa?auto=format&fit=crop&w=800&q=80",
+    "category": "hill_station"
+  },
+  {
+    "id": "gokarna",
+    "name": "Gokarna",
+    "state": "Karnataka",
+    "latitude": 14.5479,
+    "longitude": 74.3188,
+    "blurb": "Laid-back coastal pilgrimage town where jungle cliffs meet pristine shores like Om Beach.",
+    "imageUrl": "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80",
+    "category": "beach"
+  },
+  {
+    "id": "chikmagalur",
+    "name": "Chikmagalur",
+    "state": "Karnataka",
+    "latitude": 13.3161,
+    "longitude": 75.772,
+    "blurb": "Birthplace of Indian coffee, featuring green mountain peaks like Mullayanagiri for trekking.",
+    "imageUrl": "https://images.unsplash.com/photo-1511497584788-87676104235f?auto=format&fit=crop&w=800&q=80",
+    "category": "nature"
+  },
+  {
+    "id": "dandeli",
+    "name": "Dandeli",
+    "state": "Karnataka",
+    "latitude": 15.2361,
+    "longitude": 74.6173,
+    "blurb": "Adrenaline capital of the Western Ghats on the Kali River, famous for river rafting and hornbills.",
+    "imageUrl": "https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=800&q=80",
+    "category": "adventure"
+  },
+  {
+    "id": "badami",
+    "name": "Badami, Aihole & Pattadakal",
+    "state": "Karnataka",
+    "latitude": 15.9187,
+    "longitude": 75.6766,
+    "blurb": "Ancient capital of the Chalukyas with red sandstone cave temples overlooking Agastya lake.",
+    "imageUrl": "https://images.unsplash.com/photo-1600100397608-f010f443b71a?auto=format&fit=crop&w=800&q=80",
+    "category": "heritage"
+  },
+  {
+    "id": "murudeshwar",
+    "name": "Murudeshwar & Udupi",
+    "state": "Karnataka",
+    "latitude": 14.094,
+    "longitude": 74.4899,
+    "blurb": "World's second tallest Shiva statue over the Arabian Sea, coupled with Udupi's Krishna temple and cuisine.",
+    "imageUrl": "https://images.unsplash.com/photo-1600100397608-f010f443b71a?auto=format&fit=crop&w=800&q=80",
+    "category": "spiritual"
+  },
+  {
+    "id": "hyderabad",
+    "name": "Hyderabad",
+    "state": "Telangana",
+    "latitude": 17.385,
+    "longitude": 78.4867,
+    "blurb": "City of Pearls with the historic Charminar, Golconda Fort, and world-famous fragrant Hyderabadi Biryani.",
+    "imageUrl": "https://images.unsplash.com/photo-1572435555646-7ad1b6b553c7?auto=format&fit=crop&w=800&q=80",
+    "category": "metropolis"
+  },
+  {
+    "id": "warangal",
+    "name": "Warangal",
+    "state": "Telangana",
+    "latitude": 17.9784,
+    "longitude": 79.5941,
+    "blurb": "Historic Kakatiya capital famed for Ramappa UNESCO Temple, thousand-pillar temple, and stone gateways.",
+    "imageUrl": "https://images.unsplash.com/photo-1600100397608-f010f443b71a?auto=format&fit=crop&w=800&q=80",
+    "category": "heritage"
+  },
+  {
+    "id": "visakhapatnam",
+    "name": "Visakhapatnam",
+    "state": "Andhra Pradesh",
+    "latitude": 17.6868,
+    "longitude": 83.2185,
+    "blurb": "The Jewel of the East Coast with pristine beaches, Rishikonda, Kailasagiri hill, and submarine museum.",
+    "imageUrl": "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80",
+    "category": "coastal"
+  },
+  {
+    "id": "tirupati",
+    "name": "Tirupati",
+    "state": "Andhra Pradesh",
+    "latitude": 13.6288,
+    "longitude": 79.4192,
+    "blurb": "Home to the revered Venkateswara Temple atop the sacred Tirumala Seven Hills.",
+    "imageUrl": "https://images.unsplash.com/photo-1600100397608-f010f443b71a?auto=format&fit=crop&w=800&q=80",
+    "category": "spiritual"
+  },
+  {
+    "id": "araku-valley",
+    "name": "Araku Valley",
+    "state": "Andhra Pradesh",
+    "latitude": 18.3273,
+    "longitude": 82.8775,
+    "blurb": "Scenic Eastern Ghats hill valley celebrated for organic coffee plantations, waterfalls, and Borra Caves.",
+    "imageUrl": "https://images.unsplash.com/photo-1544735716-392fe2489ffa?auto=format&fit=crop&w=800&q=80",
+    "category": "nature"
+  },
+  {
+    "id": "gandikota",
+    "name": "Gandikota & Lepakshi",
+    "state": "Andhra Pradesh",
+    "latitude": 14.8152,
+    "longitude": 78.2861,
+    "blurb": "The Grand Canyon of India carved by the Pennar river, alongside the hanging pillar marvel of Lepakshi.",
+    "imageUrl": "https://images.unsplash.com/photo-1517824806704-9040b037703b?auto=format&fit=crop&w=800&q=80",
+    "category": "heritage"
+  },
+  {
+    "id": "kochi",
+    "name": "Kochi",
+    "state": "Kerala",
+    "latitude": 9.9312,
+    "longitude": 76.2673,
+    "blurb": "Queen of the Arabian Sea featuring Chinese fishing nets, colonial Fort Kochi streets, and spice markets.",
+    "imageUrl": "https://images.unsplash.com/photo-1602216056096-3b40cc0c9944?auto=format&fit=crop&w=800&q=80",
+    "category": "coastal"
+  },
+  {
+    "id": "munnar",
+    "name": "Munnar",
+    "state": "Kerala",
+    "latitude": 10.0889,
+    "longitude": 77.0595,
+    "blurb": "Rolling emerald green carpet of tea plantations, cool mountain mists, and Anamudi peak.",
+    "imageUrl": "https://images.unsplash.com/photo-1596707328570-5b65103d1591?auto=format&fit=crop&w=800&q=80",
+    "category": "hill_station"
+  },
+  {
+    "id": "alleppey",
+    "name": "Alleppey (Alappuzha)",
+    "state": "Kerala",
+    "latitude": 9.4981,
+    "longitude": 76.3388,
+    "blurb": "Venice of the East, famous for tranquil houseboat cruises drifting through palm-fringed backwaters.",
+    "imageUrl": "https://images.unsplash.com/photo-1602216056096-3b40cc0c9944?auto=format&fit=crop&w=800&q=80",
+    "category": "nature"
+  },
+  {
+    "id": "varkala",
+    "name": "Varkala",
+    "state": "Kerala",
+    "latitude": 8.7379,
+    "longitude": 76.7163,
+    "blurb": "Stunning red laterite cliffs bordering the Arabian Sea with bohemian cafes, yoga, and surf waves.",
+    "imageUrl": "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80",
+    "category": "beach"
+  },
+  {
+    "id": "wayanad",
+    "name": "Wayanad",
+    "state": "Kerala",
+    "latitude": 11.6854,
+    "longitude": 76.132,
+    "blurb": "Pristine highland paradise filled with spice groves, prehistoric Edakkal Caves, and wildlife sanctuaries.",
+    "imageUrl": "https://images.unsplash.com/photo-1544735716-392fe2489ffa?auto=format&fit=crop&w=800&q=80",
+    "category": "nature"
+  },
+  {
+    "id": "thekkady",
+    "name": "Thekkady (Periyar)",
+    "state": "Kerala",
+    "latitude": 9.6031,
+    "longitude": 77.1615,
+    "blurb": "Periyar National Park haven of wild elephant herds, lake boat safaris, and fragrant spice plantations.",
+    "imageUrl": "https://images.unsplash.com/photo-1534567153574-2b12153a87f0?auto=format&fit=crop&w=800&q=80",
+    "category": "nature"
+  },
+  {
+    "id": "kovalam",
+    "name": "Kovalam & Trivandrum",
+    "state": "Kerala",
+    "latitude": 8.4004,
+    "longitude": 76.9787,
+    "blurb": "Crescent beach with iconic red-and-white lighthouse and Padmanabhaswamy Temple in the state capital.",
+    "imageUrl": "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80",
+    "category": "coastal"
+  },
+  {
+    "id": "chennai",
+    "name": "Chennai",
+    "state": "Tamil Nadu",
+    "latitude": 13.0827,
+    "longitude": 80.2707,
+    "blurb": "Gateway to South India boasting Marina Beach, classical Carnatic music traditions, and Dravidian temples.",
+    "imageUrl": "https://images.unsplash.com/photo-1582510003544-4d00b7f74220?auto=format&fit=crop&w=800&q=80",
+    "category": "metropolis"
+  },
+  {
+    "id": "mahabalipuram",
+    "name": "Mahabalipuram",
+    "state": "Tamil Nadu",
+    "latitude": 12.6269,
+    "longitude": 80.1927,
+    "blurb": "UNESCO coastal monument city of 7th-century Pallava shore temples and colossal rock-cut bas-reliefs.",
+    "imageUrl": "https://images.unsplash.com/photo-1600100397608-f010f443b71a?auto=format&fit=crop&w=800&q=80",
+    "category": "heritage"
+  },
+  {
+    "id": "madurai",
+    "name": "Madurai",
+    "state": "Tamil Nadu",
+    "latitude": 9.9252,
+    "longitude": 78.1198,
+    "blurb": "Ancient temple city centered around the breathtaking towering gopurams of Meenakshi Amman Temple.",
+    "imageUrl": "https://images.unsplash.com/photo-1582510003544-4d00b7f74220?auto=format&fit=crop&w=800&q=80",
+    "category": "spiritual"
+  },
+  {
+    "id": "rameswaram",
+    "name": "Rameswaram & Dhanushkodi",
+    "state": "Tamil Nadu",
+    "latitude": 9.2876,
+    "longitude": 79.3129,
+    "blurb": "Sacred island pilgrimage town connected by the iconic Pamban Bridge and the ghost city of Dhanushkodi.",
+    "imageUrl": "https://images.unsplash.com/photo-1600100397608-f010f443b71a?auto=format&fit=crop&w=800&q=80",
+    "category": "spiritual"
+  },
+  {
+    "id": "thanjavur",
+    "name": "Thanjavur",
+    "state": "Tamil Nadu",
+    "latitude": 10.787,
+    "longitude": 79.1378,
+    "blurb": "Cultural cradle of the Cholas, home to the magnificent 1,000-year-old Brihadisvara UNESCO Temple.",
+    "imageUrl": "https://images.unsplash.com/photo-1600100397608-f010f443b71a?auto=format&fit=crop&w=800&q=80",
+    "category": "heritage"
+  },
+  {
+    "id": "ooty",
+    "name": "Ooty & Coonoor",
+    "state": "Tamil Nadu",
+    "latitude": 11.4102,
+    "longitude": 76.695,
+    "blurb": "Queen of the Nilgiris known for the Nilgiri Mountain Toy Train, botanical gardens, and eucalyptus woods.",
+    "imageUrl": "https://images.unsplash.com/photo-1596707328570-5b65103d1591?auto=format&fit=crop&w=800&q=80",
+    "category": "hill_station"
+  },
+  {
+    "id": "kodaikanal",
+    "name": "Kodaikanal",
+    "state": "Tamil Nadu",
+    "latitude": 10.2381,
+    "longitude": 77.4892,
+    "blurb": "Princess of Hill Stations with a star-shaped lake, Pillar Rocks, and misty pine forest walks.",
+    "imageUrl": "https://images.unsplash.com/photo-1511497584788-87676104235f?auto=format&fit=crop&w=800&q=80",
+    "category": "hill_station"
+  },
+  {
+    "id": "kanyakumari",
+    "name": "Kanyakumari",
+    "state": "Tamil Nadu",
+    "latitude": 8.0883,
+    "longitude": 77.5385,
+    "blurb": "Southernmost tip of mainland India where the Indian Ocean, Arabian Sea, and Bay of Bengal unite.",
+    "imageUrl": "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80",
+    "category": "coastal"
+  },
+  {
+    "id": "pondicherry",
+    "name": "Pondicherry & Auroville",
+    "state": "Puducherry",
+    "latitude": 11.9416,
+    "longitude": 79.8083,
+    "blurb": "French colonial seaside town with cobblestone boulevards, pastel villas, croissants, and Matrimandir.",
+    "imageUrl": "https://images.unsplash.com/photo-1582510003544-4d00b7f74220?auto=format&fit=crop&w=800&q=80",
+    "category": "coastal"
+  },
+  {
+    "id": "kolkata",
+    "name": "Kolkata",
+    "state": "West Bengal",
+    "latitude": 22.5726,
+    "longitude": 88.3639,
+    "blurb": "City of Joy steeped in literature, Victoria Memorial, Howrah Bridge, trams, and Durga Puja fervor.",
+    "imageUrl": "https://images.unsplash.com/photo-1558431382-27e303142255?auto=format&fit=crop&w=800&q=80",
+    "category": "metropolis"
+  },
+  {
+    "id": "darjeeling",
+    "name": "Darjeeling & Kalimpong",
+    "state": "West Bengal",
+    "latitude": 27.041,
+    "longitude": 88.2663,
+    "blurb": "Queen of the Hills renowned for world-class tea, the Himalayan toy train, and sunrise over Kanchenjunga.",
+    "imageUrl": "https://images.unsplash.com/photo-1544735716-392fe2489ffa?auto=format&fit=crop&w=800&q=80",
+    "category": "hill_station"
+  },
+  {
+    "id": "sunderbans",
+    "name": "Sundarbans",
+    "state": "West Bengal",
+    "latitude": 21.9497,
+    "longitude": 89.1833,
+    "blurb": "World's largest mangrove delta, domain of the swimming Royal Bengal tiger and estuarine crocodiles.",
+    "imageUrl": "https://images.unsplash.com/photo-1534567153574-2b12153a87f0?auto=format&fit=crop&w=800&q=80",
+    "category": "nature"
+  },
+  {
+    "id": "puri",
+    "name": "Puri",
+    "state": "Odisha",
+    "latitude": 19.8135,
+    "longitude": 85.8312,
+    "blurb": "Spiritual coastal sanctuary of the sacred Jagannath Temple, famous for the annual grand Rath Yatra.",
+    "imageUrl": "https://images.unsplash.com/photo-1600100397608-f010f443b71a?auto=format&fit=crop&w=800&q=80",
+    "category": "spiritual"
+  },
+  {
+    "id": "konark",
+    "name": "Konark",
+    "state": "Odisha",
+    "latitude": 19.8876,
+    "longitude": 86.0945,
+    "blurb": "Marvel of ancient architectural genius: the 13th-century Sun Temple carved like a colossal stone chariot.",
+    "imageUrl": "https://images.unsplash.com/photo-1600100397608-f010f443b71a?auto=format&fit=crop&w=800&q=80",
+    "category": "heritage"
+  },
+  {
+    "id": "bhubaneswar",
+    "name": "Bhubaneswar",
+    "state": "Odisha",
+    "latitude": 20.2961,
+    "longitude": 85.8245,
+    "blurb": "Temple City of India with hundreds of Kalinga architectural gems like Lingaraj Temple and Khandagiri caves.",
+    "imageUrl": "https://images.unsplash.com/photo-1600100397608-f010f443b71a?auto=format&fit=crop&w=800&q=80",
+    "category": "heritage"
+  },
+  {
+    "id": "chilika-lake",
+    "name": "Chilika Lake",
+    "state": "Odisha",
+    "latitude": 19.716,
+    "longitude": 85.3217,
+    "blurb": "Asia's largest brackish lagoon, sheltering endangered Irrawaddy dolphins and migratory bird flocks.",
+    "imageUrl": "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80",
+    "category": "nature"
+  },
+  {
+    "id": "guwahati",
+    "name": "Guwahati",
+    "state": "Assam",
+    "latitude": 26.1445,
+    "longitude": 91.7362,
+    "blurb": "Gateway to the Northeast on the mighty Brahmaputra River, home to the sacred Kamakhya Temple.",
+    "imageUrl": "https://images.unsplash.com/photo-1544735716-392fe2489ffa?auto=format&fit=crop&w=800&q=80",
+    "category": "urban"
+  },
+  {
+    "id": "kaziranga",
+    "name": "Kaziranga National Park",
+    "state": "Assam",
+    "latitude": 26.5775,
+    "longitude": 93.1711,
+    "blurb": "UNESCO haven protecting two-thirds of the world's great one-horned rhinoceroses in tall elephant grass.",
+    "imageUrl": "https://images.unsplash.com/photo-1534567153574-2b12153a87f0?auto=format&fit=crop&w=800&q=80",
+    "category": "nature"
+  },
+  {
+    "id": "majuli",
+    "name": "Majuli",
+    "state": "Assam",
+    "latitude": 26.9544,
+    "longitude": 94.2037,
+    "blurb": "World's largest inhabited river island on the Brahmaputra, heart of Neo-Vaishnavite Satra culture.",
+    "imageUrl": "https://images.unsplash.com/photo-1602216056096-3b40cc0c9944?auto=format&fit=crop&w=800&q=80",
+    "category": "nature"
+  },
+  {
+    "id": "shillong",
+    "name": "Shillong",
+    "state": "Meghalaya",
+    "latitude": 25.5788,
+    "longitude": 91.8933,
+    "blurb": "Scotland of the East, famed for rock music culture, pine-covered hills, and Umiam Lake.",
+    "imageUrl": "https://images.unsplash.com/photo-1544735716-392fe2489ffa?auto=format&fit=crop&w=800&q=80",
+    "category": "hill_station"
+  },
+  {
+    "id": "cherrapunji",
+    "name": "Cherrapunji & Dawki",
+    "state": "Meghalaya",
+    "latitude": 25.2986,
+    "longitude": 91.73,
+    "blurb": "Land of clouds, thunderous Nohkalikai falls, living root bridges, and crystal-clear Umngot river.",
+    "imageUrl": "https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=800&q=80",
+    "category": "nature"
+  },
+  {
+    "id": "gangtok",
+    "name": "Gangtok",
+    "state": "Sikkim",
+    "latitude": 27.3389,
+    "longitude": 88.6065,
+    "blurb": "Clean mountain city with views of Mount Kanchenjunga, vibrant Buddhist monasteries, and cable cars.",
+    "imageUrl": "https://images.unsplash.com/photo-1544735716-392fe2489ffa?auto=format&fit=crop&w=800&q=80",
+    "category": "hill_station"
+  },
+  {
+    "id": "pelling",
+    "name": "Pelling",
+    "state": "Sikkim",
+    "latitude": 27.3164,
+    "longitude": 88.2415,
+    "blurb": "Closest and clearest vantage point for Mount Kanchenjunga, with glass skywalk and Pemayangtse monastery.",
+    "imageUrl": "https://images.unsplash.com/photo-1517824806704-9040b037703b?auto=format&fit=crop&w=800&q=80",
+    "category": "nature"
+  },
+  {
+    "id": "tawang",
+    "name": "Tawang",
+    "state": "Arunachal Pradesh",
+    "latitude": 27.5861,
+    "longitude": 91.8594,
+    "blurb": "Himalayan town at 10,000 feet housing India's largest Buddhist monastery near Sela Pass.",
+    "imageUrl": "https://images.unsplash.com/photo-1581793745862-99fde7fa73d2?auto=format&fit=crop&w=800&q=80",
+    "category": "adventure"
+  },
+  {
+    "id": "ziro",
+    "name": "Ziro Valley",
+    "state": "Arunachal Pradesh",
+    "latitude": 27.595,
+    "longitude": 93.834,
+    "blurb": "Idyllic pine and paddy valley home to the Apatani tribe and the famous Ziro Music Festival.",
+    "imageUrl": "https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=800&q=80",
+    "category": "nature"
+  },
+  {
+    "id": "kohima",
+    "name": "Kohima & Dzukou Valley",
+    "state": "Nagaland",
+    "latitude": 25.6751,
+    "longitude": 94.1086,
+    "blurb": "Capital of the brave Angami Nagas, host to Hornbill Festival, and mystical lily-carpeted Dzukou Valley.",
+    "imageUrl": "https://images.unsplash.com/photo-1544735716-392fe2489ffa?auto=format&fit=crop&w=800&q=80",
+    "category": "hill_station"
+  },
+  {
+    "id": "loktak-lake",
+    "name": "Loktak Lake (Moirang)",
+    "state": "Manipur",
+    "latitude": 24.55,
+    "longitude": 93.7833,
+    "blurb": "The only floating national park on Earth with circular phumdis and the endangered Sangai brow-antlered deer.",
+    "imageUrl": "https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=800&q=80",
+    "category": "nature"
+  },
+  {
+    "id": "aizawl",
+    "name": "Aizawl",
+    "state": "Mizoram",
+    "latitude": 23.7271,
+    "longitude": 92.7176,
+    "blurb": "Hilltop haven of the friendly Mizo community, framed by deep valleys and bamboo forests.",
+    "imageUrl": "https://images.unsplash.com/photo-1511497584788-87676104235f?auto=format&fit=crop&w=800&q=80",
+    "category": "hill_station"
+  },
+  {
+    "id": "agartala",
+    "name": "Agartala & Unakoti",
+    "state": "Tripura",
+    "latitude": 23.8315,
+    "longitude": 91.2868,
+    "blurb": "Ujjayanta royal palace, water palace Neermahal, and ancient rock carvings of Unakoti.",
+    "imageUrl": "https://images.unsplash.com/photo-1600100397608-f010f443b71a?auto=format&fit=crop&w=800&q=80",
+    "category": "heritage"
+  },
+  {
+    "id": "port-blair",
+    "name": "Port Blair",
+    "state": "Andaman & Nicobar Islands",
+    "latitude": 11.6234,
+    "longitude": 92.7265,
+    "blurb": "Island capital with historic Cellular Jail, emerald waters, coral reefs, and ferry links.",
+    "imageUrl": "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80",
+    "category": "coastal"
+  },
+  {
+    "id": "havelock-island",
+    "name": "Havelock Island (Swaraj Dweep)",
+    "state": "Andaman & Nicobar Islands",
+    "latitude": 11.9761,
+    "longitude": 92.9876,
+    "blurb": "World-famous Radhanagar Beach, turquoise diving spots, and bioluminescent kayak night tours.",
+    "imageUrl": "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80",
+    "category": "beach"
+  },
+  {
+    "id": "lakshadweep",
+    "name": "Lakshadweep (Agatti & Bangaram)",
+    "state": "Lakshadweep",
+    "latitude": 10.8533,
+    "longitude": 72.1944,
+    "blurb": "Untouched coral atolls, dazzling turquoise lagoons, white coral sands, and world-class diving.",
+    "imageUrl": "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80",
+    "category": "beach"
+  },
+  {
+    "id": "bundi",
+    "name": "Bundi",
+    "state": "Rajasthan",
+    "latitude": 25.4414,
+    "longitude": 75.642,
+    "blurb": "Charming blue-hued town of baolis (stepwells), Taragarh Fort, and miniature mural art.",
+    "imageUrl": "https://images.unsplash.com/photo-1599661046289-e31897846e41?auto=format&fit=crop&w=800&q=80",
+    "category": "heritage"
+  },
+  {
+    "id": "alwar",
+    "name": "Alwar & Sariska",
+    "state": "Rajasthan",
+    "latitude": 27.553,
+    "longitude": 76.6346,
+    "blurb": "Gateway to Sariska Tiger Reserve, historic Bala Quila fort, and Siliserh Lake palace.",
+    "imageUrl": "https://images.unsplash.com/photo-1534567153574-2b12153a87f0?auto=format&fit=crop&w=800&q=80",
+    "category": "heritage"
+  },
+  {
+    "id": "mandawa",
+    "name": "Mandawa (Shekhawati)",
+    "state": "Rajasthan",
+    "latitude": 28.0558,
+    "longitude": 75.1489,
+    "blurb": "Open-air art gallery famous for lavishly frescoed merchant havelis in the desert.",
+    "imageUrl": "https://images.unsplash.com/photo-1599661046289-e31897846e41?auto=format&fit=crop&w=800&q=80",
+    "category": "heritage"
+  },
+  {
+    "id": "junagadh",
+    "name": "Junagadh",
+    "state": "Gujarat",
+    "latitude": 21.5222,
+    "longitude": 70.4579,
+    "blurb": "Historic city at the base of sacred Girnar Hill with ancient Uparkot Fort and Mahabat Maqbara.",
+    "imageUrl": "https://images.unsplash.com/photo-1600100397608-f010f443b71a?auto=format&fit=crop&w=800&q=80",
+    "category": "heritage"
+  },
+  {
+    "id": "daman-diu",
+    "name": "Diu & Daman",
+    "state": "Dadra and Nagar Haveli and Daman and Diu",
+    "latitude": 20.7144,
+    "longitude": 70.9874,
+    "blurb": "Portuguese coastal fortress island with Nagoa beach, St. Paul church, and coastal bastions.",
+    "imageUrl": "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80",
+    "category": "beach"
+  },
+  {
+    "id": "kolhapur",
+    "name": "Kolhapur",
+    "state": "Maharashtra",
+    "latitude": 16.705,
+    "longitude": 74.2433,
+    "blurb": "Historic Maratha city renowned for Mahalakshmi Temple, Kolhapuri chappals, and wrestling akhadas.",
+    "imageUrl": "https://images.unsplash.com/photo-1600100397608-f010f443b71a?auto=format&fit=crop&w=800&q=80",
+    "category": "heritage"
+  },
+  {
+    "id": "ratnagiri",
+    "name": "Ratnagiri & Ganpatipule",
+    "state": "Maharashtra",
+    "latitude": 16.9902,
+    "longitude": 73.312,
+    "blurb": "Alphonso mango capital on the Konkan coast featuring Jaigad Fort and seaside Ganpatipule temple.",
+    "imageUrl": "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80",
+    "category": "coastal"
+  },
+  {
+    "id": "bhandardara",
+    "name": "Bhandardara & Igatpuri",
+    "state": "Maharashtra",
+    "latitude": 19.5375,
+    "longitude": 73.7663,
+    "blurb": "Serene Sahyadri lake retreat beneath Mount Kalsubai, Maharashtra highest peak, with firefly festival.",
+    "imageUrl": "https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=800&q=80",
+    "category": "nature"
+  },
+  {
+    "id": "belur-halebidu",
+    "name": "Belur & Halebidu",
+    "state": "Karnataka",
+    "latitude": 13.1623,
+    "longitude": 75.8576,
+    "blurb": "UNESCO World Heritage Hoysala temples showcasing stone carvings of unrivaled detail and beauty.",
+    "imageUrl": "https://images.unsplash.com/photo-1600100397608-f010f443b71a?auto=format&fit=crop&w=800&q=80",
+    "category": "heritage"
+  },
+  {
+    "id": "jog-falls",
+    "name": "Jog Falls & Shimoga",
+    "state": "Karnataka",
+    "latitude": 14.2285,
+    "longitude": 74.8122,
+    "blurb": "Second highest plunge waterfall in India, cascading down 830 feet in four majestic torrents.",
+    "imageUrl": "https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=800&q=80",
+    "category": "nature"
+  },
+  {
+    "id": "kumarakom",
+    "name": "Kumarakom",
+    "state": "Kerala",
+    "latitude": 9.6175,
+    "longitude": 76.4301,
+    "blurb": "Vembanad Lake paradise of luxury resorts, bird sanctuary, and tranquil backwater canoe rides.",
+    "imageUrl": "https://images.unsplash.com/photo-1602216056096-3b40cc0c9944?auto=format&fit=crop&w=800&q=80",
+    "category": "nature"
+  },
+  {
+    "id": "bekal",
+    "name": "Bekal",
+    "state": "Kerala",
+    "latitude": 12.3927,
+    "longitude": 75.0336,
+    "blurb": "Majestic keyhole-shaped seaside fort rising dramatically above crashing Arabian Sea breakers.",
+    "imageUrl": "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80",
+    "category": "coastal"
+  },
+  {
+    "id": "athirappilly",
+    "name": "Athirappilly Waterfalls",
+    "state": "Kerala",
+    "latitude": 10.2851,
+    "longitude": 76.5698,
+    "blurb": "The Niagara of South India, an 80-foot wide thundering cascade fringed by rainforest.",
+    "imageUrl": "https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=800&q=80",
+    "category": "nature"
+  },
+  {
+    "id": "trichy",
+    "name": "Tiruchirappalli (Trichy)",
+    "state": "Tamil Nadu",
+    "latitude": 10.7905,
+    "longitude": 78.7047,
+    "blurb": "Home of the colossal Sri Ranganathaswamy Temple at Srirangam and the ancient Rockfort Temple.",
+    "imageUrl": "https://images.unsplash.com/photo-1600100397608-f010f443b71a?auto=format&fit=crop&w=800&q=80",
+    "category": "spiritual"
+  },
+  {
+    "id": "tiruvannamalai",
+    "name": "Tiruvannamalai",
+    "state": "Tamil Nadu",
+    "latitude": 12.2253,
+    "longitude": 79.0747,
+    "blurb": "Sacred Mount Arunachala, Annamalaiyar Shiva temple representing the Fire element, and Ramana Ashram.",
+    "imageUrl": "https://images.unsplash.com/photo-1600100397608-f010f443b71a?auto=format&fit=crop&w=800&q=80",
+    "category": "spiritual"
+  },
+  {
+    "id": "kanchipuram",
+    "name": "Kanchipuram",
+    "state": "Tamil Nadu",
+    "latitude": 12.8342,
+    "longitude": 79.7036,
+    "blurb": "City of Thousand Temples and world-renowned pure mulberry Kanchipuram silk sarees.",
+    "imageUrl": "https://images.unsplash.com/photo-1600100397608-f010f443b71a?auto=format&fit=crop&w=800&q=80",
+    "category": "heritage"
+  },
+  {
+    "id": "yercaud",
+    "name": "Yercaud",
+    "state": "Tamil Nadu",
+    "latitude": 11.7753,
+    "longitude": 78.2093,
+    "blurb": "Jewel of the South in the Shevaroy Hills, celebrated for coffee plantations, oranges, and Big Lake.",
+    "imageUrl": "https://images.unsplash.com/photo-1596707328570-5b65103d1591?auto=format&fit=crop&w=800&q=80",
+    "category": "hill_station"
+  },
+  {
+    "id": "digha",
+    "name": "Digha & Mandarmani",
+    "state": "West Bengal",
+    "latitude": 21.6266,
+    "longitude": 87.5074,
+    "blurb": "Most popular beach resort on the Bay of Bengal, known for flat hard beaches and fresh seafood.",
+    "imageUrl": "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80",
+    "category": "beach"
+  },
+  {
+    "id": "shantiniketan",
+    "name": "Shantiniketan",
+    "state": "West Bengal",
+    "latitude": 23.6797,
+    "longitude": 87.6836,
+    "blurb": "UNESCO World Heritage university town founded by Rabindranath Tagore, celebrating art and Baul music.",
+    "imageUrl": "https://images.unsplash.com/photo-1544735716-392fe2489ffa?auto=format&fit=crop&w=800&q=80",
+    "category": "heritage"
+  },
+  {
+    "id": "almora",
+    "name": "Almora & Kausani",
+    "state": "Uttarakhand",
+    "latitude": 29.5971,
+    "longitude": 79.6591,
+    "blurb": "Cultural heart of Kumaon with 300-km panoramic views of Trishul and Nanda Devi peaks.",
+    "imageUrl": "https://images.unsplash.com/photo-1596401057633-54a8fe8ef647?auto=format&fit=crop&w=800&q=80",
+    "category": "hill_station"
+  },
+  {
+    "id": "valley-of-flowers",
+    "name": "Valley of Flowers",
+    "state": "Uttarakhand",
+    "latitude": 30.728,
+    "longitude": 79.6053,
+    "blurb": "UNESCO high-altitude Himalayan valley carpeted in hundreds of species of wild alpine blooms.",
+    "imageUrl": "https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=800&q=80",
+    "category": "nature"
+  },
+  {
+    "id": "palampur",
+    "name": "Palampur & Kangra",
+    "state": "Himachal Pradesh",
+    "latitude": 32.1109,
+    "longitude": 76.5363,
+    "blurb": "Tea capital of northwest India set against the dramatic snow peaks of Dhauladhar.",
+    "imageUrl": "https://images.unsplash.com/photo-1597074866923-dc0589150358?auto=format&fit=crop&w=800&q=80",
+    "category": "hill_station"
+  }
+]

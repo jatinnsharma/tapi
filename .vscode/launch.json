@@ -1,0 +1,25 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "real_world_exploration",
+      "request": "launch",
+      "type": "dart",
+      "args": ["--dart-define-from-file=dart_defines.local.json"]
+    },
+    {
+      "name": "real_world_exploration (profile)",
+      "request": "launch",
+      "type": "dart",
+      "flutterMode": "profile",
+      "args": ["--dart-define-from-file=dart_defines.local.json"]
+    },
+    {
+      "name": "real_world_exploration (release)",
+      "request": "launch",
+      "type": "dart",
+      "flutterMode": "release",
+      "args": ["--dart-define-from-file=dart_defines.local.json"]
+    }
+  ]
+}
