@@ -15,7 +15,6 @@ import '../data/saved_trips_repository.dart';
 import '../domain/opening_hours.dart';
 import '../domain/trip_extras.dart';
 import '../domain/trip_plan.dart';
-import 'itinerary_detail_screen.dart';
 import 'stop_actions.dart';
 import 'stop_hours.dart';
 
@@ -121,7 +120,7 @@ class TripHomeCard extends ConsumerWidget {
               ? 'Your trip today'
               : 'Your trip',
           actionLabel: trips.isEmpty ? null : 'All trips',
-          onAction: trips.isEmpty ? null : () => context.push('/my-trips'),
+          onAction: trips.isEmpty ? null : () => context.go('/trips'),
         ),
         switch (featured) {
           null => const _PlanTripInvite(),
@@ -153,11 +152,7 @@ class TripHomeCard extends ConsumerWidget {
 }
 
 void _openTrip(BuildContext context, TripPlan plan, {int day = 0}) {
-  Navigator.of(context).push(
-    MaterialPageRoute<void>(
-      builder: (_) => ItineraryDetailScreen(plan: plan, initialDayIndex: day),
-    ),
-  );
+  context.push('/trips/${plan.id}?day=$day');
 }
 
 const _titleStyle = TextStyle(
@@ -272,7 +267,12 @@ class _TodayCard extends ConsumerWidget {
                   child: FilledButton.icon(
                     onPressed: () => _go(context, ref, next),
                     icon: const Icon(Icons.navigation_rounded, size: 18),
-                    label: const Text('Go'),
+                    label: Text(
+                      done == 0
+                          ? "Start today's plan"
+                          : "Continue today's plan",
+                      overflow: TextOverflow.ellipsis,
+                    ),
                     style: FilledButton.styleFrom(
                       backgroundColor: AppTheme.forest,
                       shape: const StadiumBorder(),
@@ -285,7 +285,7 @@ class _TodayCard extends ConsumerWidget {
                 child: OutlinedButton(
                   onPressed: () => _openTrip(context, plan, day: dayIndex),
                   style: OutlinedButton.styleFrom(shape: const StadiumBorder()),
-                  child: const Text("Today's plan"),
+                  child: const Text('View day'),
                 ),
               ),
             ],

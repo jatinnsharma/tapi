@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/components.dart';
+import 'sample_data_banner.dart';
 import '../../../core/theme/glass.dart';
 import '../domain/event.dart';
 
@@ -39,7 +40,10 @@ class EventsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Events & Meetups')),
+      appBar: AppBar(
+        title: const Text('Events & Meetups'),
+        bottom: const SampleDataBanner(),
+      ),
       body: ListView.builder(
         padding: AppSpacing.page,
         itemCount: _mockEvents.length,

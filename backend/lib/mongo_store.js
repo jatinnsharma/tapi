@@ -1,8 +1,11 @@
 import { GridFSBucket, MongoClient, ObjectId } from 'mongodb';
 import { Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
+import { metersBetween } from './validate.js';
 
 const HEX24 = /^[0-9a-f]{24}$/;
+/** MongoDB's radius for $centerSphere, in metres. */
+const EARTH_RADIUS_M = 6378100;
 
 /**
  * Memories in MongoDB (`memories` collection) and their files in GridFS
@@ -24,11 +27,14 @@ export function createMongoStore(db) {
   const bucket = new GridFSBucket(db, { bucketName: 'media' });
 
   const newest = { createdAt: -1 };
+  const shown = { hidden: { $ne: true } };
 
   return {
     async ensureIndexes() {
       await memories.createIndex({ uid: 1, createdAt: -1 });
       await memories.createIndex({ visibility: 1, createdAt: -1 });
+      // Audio capsules are found by where they were left.
+      await memories.createIndex({ geo: '2dsphere' });
     },
 
     // --- files ---
@@ -85,13 +91,62 @@ export function createMongoStore(db) {
     countByOwner: (uid) => memories.countDocuments({ uid }),
     listByOwner: (uid) => memories.find({ uid }).toArray(),
     listPublic: (limit) =>
-      memories.find({ visibility: 'public' }).sort(newest).limit(limit).toArray(),
-    listForOwners: (uids, visibilities, limit) =>
       memories
-        .find({ uid: { $in: uids }, visibility: { $in: visibilities } })
+        .find({ visibility: 'public', ...shown })
         .sort(newest)
         .limit(limit)
         .toArray(),
+    listForOwners: (uids, visibilities, limit) =>
+      memories
+        .find({ uid: { $in: uids }, visibility: { $in: visibilities }, ...shown })
+        .sort(newest)
+        .limit(limit)
+        .toArray(),
+    /** Visible capsules within [meters], nearest first. [friendUids] may see
+     *  friends-only ones. `$geoWithin` (not `$nearSphere`, which can't be
+     *  combined with `$or`), then sorted by distance here. */
+    async listCapsulesNear(lat, lng, meters, friendUids, limit) {
+      const found = await memories
+        .find({
+          type: 'voice',
+          ...shown,
+          $or: [
+            { visibility: 'public' },
+            { visibility: 'friends', uid: { $in: friendUids } },
+          ],
+          geo: {
+            $geoWithin: { $centerSphere: [[lng, lat], meters / EARTH_RADIUS_M] },
+          },
+        })
+        .limit(500)
+        .toArray();
+      const here = { lat, lng };
+      return found
+        .map((m) => ({
+          m,
+          d: metersBetween(here, { lat: m.geo.coordinates[1], lng: m.geo.coordinates[0] }),
+        }))
+        .sort((a, b) => a.d - b.d)
+        .slice(0, limit)
+        .map(({ m }) => m);
+    },
+    countOwnerCapsulesNear: (uid, lat, lng, meters) =>
+      memories.countDocuments({
+        uid,
+        type: 'voice',
+        geo: {
+          $geoWithin: { $centerSphere: [[lng, lat], meters / EARTH_RADIUS_M] },
+        },
+      }),
+    /** Records [uid]'s report once; returns how many people reported it. */
+    async addReport(id, uid) {
+      const after = await memories.findOneAndUpdate(
+        { _id: id },
+        { $addToSet: { reportedBy: uid } },
+        { returnDocument: 'after' },
+      );
+      return after?.reportedBy?.length ?? 0;
+    },
     async upsertMemory(doc) {
       await memories.replaceOne({ _id: doc._id }, doc, { upsert: true });
     },

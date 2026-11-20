@@ -1,115 +1,183 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../../core/theme/app_components.dart';
 import '../../core/theme/components.dart';
 import 'application/rank_style_service.dart';
 import 'domain/rank_style.dart';
 import 'rank_frame.dart';
 
-/// Rank rewards: every rank unlocks a profile frame and a trail colour. Tap an
-/// unlocked one to wear it; locked ones show how much XP is missing.
-class RankRewardsCard extends ConsumerWidget {
-  const RankRewardsCard({super.key});
+/// "Rank & styles": every rank unlocks a frame for your profile photo and
+/// a colour for the routes you walk. Tap an unlocked one to wear it.
+Future<void> showRankStylesSheet(BuildContext context, {String? name}) {
+  return showAppSheet<void>(
+    context,
+    title: 'Rank & styles',
+    body: RankStylesList(initial: name),
+  );
+}
+
+class RankStylesList extends ConsumerWidget {
+  const RankStylesList({super.key, this.initial});
+
+  /// Your name, so the previews show your own initial.
+  final String? initial;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final state = ref.watch(rankStyleProvider).value;
-    if (state == null) return const SizedBox.shrink();
+    final text = Theme.of(context).textTheme;
+    final colors = AppColors.of(context);
+    final async = ref.watch(rankStyleProvider);
+    final state = async.value;
+    if (state == null) {
+      return async.hasError
+          ? ErrorState(
+              error: async.error!,
+              onRetry: () => ref.invalidate(rankStyleProvider),
+            )
+          : const Padding(
+              padding: EdgeInsets.all(24),
+              child: Center(child: CircularProgressIndicator()),
+            );
+    }
     final next = nextLocked(state.totalXp);
+    final letter = (initial == null || initial!.isEmpty)
+        ? 'E'
+        : initial!.substring(0, 1).toUpperCase();
 
-    return SoftCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Rank rewards',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Each rank unlocks a frame for your profile photo and a colour for '
+          'the routes you walk on the map.',
+          style: text.bodyMedium?.copyWith(color: colors.textSecondary),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          next == null
+              ? 'Every rank unlocked. Wear any style you like.'
+              : '${_xp(next.minXp - state.totalXp)} XP to unlock '
+                    '${next.title}.',
+          style: text.titleSmall,
+        ),
+        const SizedBox(height: 8),
+        for (final style in rankStyles)
+          _StyleRow(
+            style: style,
+            letter: letter,
+            unlocked: style.isUnlocked(state.totalXp),
+            equipped: style.id == state.equipped.id,
+            onTap: () async {
+              final done = await equipStyle(style, state.totalXp);
+              if (!context.mounted || !done) return;
+              ref.invalidate(rankStyleProvider);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Wearing the ${style.title} style')),
+              );
+            },
           ),
-          const SizedBox(height: 2),
-          Text(
-            next == null
-                ? 'Every rank unlocked. Wear any style you like.'
-                : '${next.minXp - state.totalXp} XP to unlock the '
-                      '${next.title} style',
-          ),
-          const SizedBox(height: 12),
-          for (final style in rankStyles)
-            _StyleRow(
-              style: style,
-              unlocked: style.isUnlocked(state.totalXp),
-              equipped: style.id == state.equipped.id,
-              missingXp: style.minXp - state.totalXp,
-              onTap: () async {
-                final done = await equipStyle(style, state.totalXp);
-                if (!context.mounted || !done) return;
-                ref.invalidate(rankStyleProvider);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('${style.title} style equipped')),
-                );
-              },
-            ),
-        ],
-      ),
+      ],
     );
   }
 }
 
+String _xp(int n) => NumberFormat.decimalPattern().format(n);
+
 class _StyleRow extends StatelessWidget {
   const _StyleRow({
     required this.style,
+    required this.letter,
     required this.unlocked,
     required this.equipped,
-    required this.missingXp,
     required this.onTap,
   });
 
   final RankStyle style;
+  final String letter;
   final bool unlocked;
   final bool equipped;
-  final int missingXp;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(16),
-      onTap: unlocked ? onTap : null,
-      child: Opacity(
-        opacity: unlocked ? 1 : 0.5,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 6),
+    final text = Theme.of(context).textTheme;
+    final colors = AppColors.of(context);
+    return Semantics(
+      button: unlocked,
+      selected: equipped,
+      label:
+          '${style.title} style, '
+          '${equipped
+              ? 'wearing'
+              : unlocked
+              ? 'unlocked'
+              : 'locked, unlocks at ${_xp(style.minXp)} XP'}',
+      excludeSemantics: true,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        onTap: unlocked ? onTap : null,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 64),
           child: Row(
             children: [
-              RankFrame(
-                style: style,
-                child: const AppAvatar(initial: 'E', size: 38),
+              // Locked previews stay at full contrast; the lock says it.
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  RankFrame(
+                    style: style,
+                    child: AppAvatar(initial: letter, size: 40),
+                  ),
+                  if (!unlocked)
+                    Positioned(
+                      right: -2,
+                      bottom: -2,
+                      child: Container(
+                        padding: const EdgeInsets.all(3),
+                        decoration: BoxDecoration(
+                          color: colors.surface,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: colors.border),
+                        ),
+                        child: Icon(
+                          Icons.lock_rounded,
+                          size: 12,
+                          color: colors.textSecondary,
+                        ),
+                      ),
+                    ),
+                ],
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      style.title,
-                      style: const TextStyle(fontWeight: FontWeight.w800),
-                    ),
+                    Text(style.title, style: text.titleSmall),
+                    const SizedBox(height: 2),
                     Row(
                       children: [
                         Container(
-                          width: 22,
-                          height: 6,
+                          width: 24,
+                          height: 8,
                           decoration: BoxDecoration(
                             color: style.trail,
-                            borderRadius: BorderRadius.circular(3),
+                            borderRadius: BorderRadius.circular(4),
                           ),
                         ),
                         const SizedBox(width: 6),
-                        Text(
-                          unlocked
-                              ? 'Frame + trail colour'
-                              : '${style.minXp} XP ($missingXp to go)',
-                          style: const TextStyle(fontSize: 12),
+                        Expanded(
+                          child: Text(
+                            unlocked
+                                ? 'Frame and route colour'
+                                : 'Unlocks at ${_xp(style.minXp)} XP',
+                            style: text.bodySmall?.copyWith(
+                              color: colors.textSecondary,
+                            ),
+                          ),
                         ),
                       ],
                     ),
@@ -117,9 +185,7 @@ class _StyleRow extends StatelessWidget {
                 ),
               ),
               if (equipped)
-                const Icon(Icons.check_circle_rounded, color: AppTheme.emerald)
-              else if (!unlocked)
-                const Icon(Icons.lock_rounded, size: 20),
+                Tag('Wearing', icon: Icons.check_rounded, tone: TagTone.brand),
             ],
           ),
         ),

@@ -10,6 +10,8 @@ import '../../../core/services/firebase_status.dart';
 import '../../auth/application/auth_service.dart';
 import '../domain/trip_plan.dart';
 import 'trip_cloud_repository.dart';
+import '../domain/plan_merge.dart';
+import 'trip_base_store.dart';
 
 final savedTripsRepositoryProvider = Provider<SavedTripsRepository>((ref) {
   return SavedTripsRepository(ref.watch(databaseServiceProvider));
@@ -49,6 +51,7 @@ class SavedTripsNotifier extends AsyncNotifier<List<TripPlan>> {
   static const cloudTimeout = Duration(seconds: 10);
 
   SavedTripsRepository get _local => ref.read(savedTripsRepositoryProvider);
+  TripBaseStore get _bases => ref.read(tripBaseStoreProvider);
   TripCloudRepository get _cloud => ref.read(tripCloudRepositoryProvider);
   String? get _uid => ref.read(tripSyncUidProvider);
 
@@ -85,28 +88,42 @@ class SavedTripsNotifier extends AsyncNotifier<List<TripPlan>> {
           // Was in the cloud and isn't now: deleted on another device, or
           // its owner stopped sharing it with this user.
           await _local.deleteTrip(trip.id);
+          await _bases.remove(trip.id);
         } else {
           result.add(await _push(_claim(trip, uid)));
         }
-      } else if (trip.lastChanged.isAfter(remote.lastChanged)) {
-        // Edited on this phone while offline. Members can't change who the
-        // trip is shared with, so keep the cloud's list.
-        result.add(
-          await _push(
-            trip.copyWith(
-              ownerUid: remote.ownerUid,
-              memberUids: remote.memberUids,
-            ),
-          ),
-        );
+        continue;
+      }
+      final base = await _bases.get(trip.id);
+      final editedHere = base == null
+          ? trip.lastChanged.isAfter(remote.lastChanged)
+          : !sameTripContent(trip, base);
+      if (editedHere) {
+        // Edited on this phone and not uploaded yet (offline). Merge with
+        // the cloud's copy, which may hold a friend's edits since.
+        final merged = base == null
+            ? trip.copyWith(
+                ownerUid: remote.ownerUid,
+                memberUids: remote.memberUids,
+              )
+            : mergePlans(
+                base: base,
+                local: trip,
+                remote: remote,
+                savedByOwner: trip.isOwnedBy(uid),
+              );
+        await _bases.set(remote);
+        result.add(await _push(merged));
       } else {
         await _local.saveTrip(remote);
+        await _bases.set(remote);
         result.add(remote);
       }
     }
     // Trips from another device, or shared by a friend.
     for (final remote in remoteById.values) {
       await _local.saveTrip(remote);
+      await _bases.set(remote);
       result.add(remote);
     }
     result.sort((a, b) => b.createdAt.compareTo(a.createdAt));
@@ -128,19 +145,29 @@ class SavedTripsNotifier extends AsyncNotifier<List<TripPlan>> {
     return trip;
   }
 
+  /// Uploads [trip] merged with any friend's edit since the last cloud copy
+  /// this phone saw, then keeps the merged result (their edits included).
   Future<void> _upload(TripPlan trip) async {
+    final TripPlan stored;
     try {
-      await _cloud.saveTrip(trip).timeout(cloudTimeout);
+      final uid = _uid;
+      stored = await _cloud
+          .saveMerged(
+            trip,
+            base: await _bases.get(trip.id),
+            savedByOwner: uid != null && trip.isOwnedBy(uid),
+          )
+          .timeout(cloudTimeout);
     } catch (_) {
       return; // Offline or Firestore not set up yet: retried on next sync.
     }
     try {
-      // Mark it synced, unless it changed again while uploading.
+      await _bases.set(stored);
+      // Keep the stored copy, unless the trip changed again meanwhile.
       final current = await _local.getTrip(trip.id);
       if (current == null || current.lastChanged != trip.lastChanged) return;
-      final synced = current.copyWith(cloudSynced: true);
-      await _local.saveTrip(synced);
-      if (ref.mounted && state.hasValue) _replaceInState(synced);
+      await _local.saveTrip(stored);
+      if (ref.mounted && state.hasValue) _replaceInState(stored);
     } catch (_) {}
   }
 
@@ -182,6 +209,7 @@ class SavedTripsNotifier extends AsyncNotifier<List<TripPlan>> {
   /// Stores a newer copy that arrived from the cloud, without re-uploading it.
   Future<void> applyRemote(TripPlan plan) async {
     await _local.saveTrip(plan);
+    await _bases.set(plan);
     _replaceInState(plan);
   }
 
@@ -190,6 +218,7 @@ class SavedTripsNotifier extends AsyncNotifier<List<TripPlan>> {
   Future<void> delete(String id) async {
     final plan = await _local.getTrip(id);
     await _local.deleteTrip(id);
+    await _bases.remove(id);
     final current = state.value;
     if (current == null) {
       ref.invalidateSelf();
@@ -276,6 +305,13 @@ class SavedTripsNotifier extends AsyncNotifier<List<TripPlan>> {
     return stored;
   }
 }
+
+final tripBaseStoreProvider = Provider<TripBaseStore>((_) => TripBaseStore());
+
+/// Same trip content, ignoring whether it has reached the cloud.
+bool sameTripContent(TripPlan a, TripPlan b) =>
+    jsonEncode(a.copyWith(cloudSynced: false).toJson()) ==
+    jsonEncode(b.copyWith(cloudSynced: false).toJson());
 
 final savedTripsListProvider =
     AsyncNotifierProvider<SavedTripsNotifier, List<TripPlan>>(

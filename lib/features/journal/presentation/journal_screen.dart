@@ -8,6 +8,7 @@ import '../../../core/theme/glass.dart';
 import '../../tracking/data/adventure_repository.dart';
 import '../../tracking/domain/adventure_session.dart';
 import 'adventure_detail_screen.dart';
+import '../../../core/ui/friendly_error.dart';
 
 final journalAdventuresProvider =
     FutureProvider.autoDispose<List<AdventureSession>>((ref) {
@@ -59,7 +60,7 @@ class JournalScreen extends ConsumerWidget {
             child: EmptyStateCard(
               icon: Icons.cloud_off_rounded,
               title: 'Could not load journal',
-              message: '$error',
+              message: friendlyError(error),
               actionLabel: 'Try again',
               onAction: () => ref.invalidate(journalAdventuresProvider),
             ),

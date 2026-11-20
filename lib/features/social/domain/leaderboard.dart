@@ -1,6 +1,6 @@
 /// Which explorers a ranking compares.
 enum RankingScope {
-  /// Every explorer (version 1 covers Chandigarh, so: everyone in the city).
+  /// Every explorer.
   global,
 
   /// You and your accepted friends.
@@ -49,11 +49,16 @@ class LeaderboardEntry {
     required this.rank,
     required this.isMe,
     this.photoUrl,
+    this.verified = false,
   });
 
   final String uid;
   final String displayName;
   final int totalXp;
+
+  /// The XP was judged by the server (`verified_xp`), not reported by the
+  /// app.
+  final bool verified;
 
   /// 1-based. Equal XP shares a rank ("1, 2, 2, 4").
   final int rank;
@@ -80,6 +85,7 @@ class Leaderboard {
 List<LeaderboardEntry> rankByXp(
   List<({String uid, String name, int xp, String? photoUrl})> explorers, {
   required String myUid,
+  bool verified = false,
 }) {
   final sorted = [...explorers]
     ..sort((a, b) {
@@ -103,6 +109,7 @@ List<LeaderboardEntry> rankByXp(
         rank: rank,
         isMe: e.uid == myUid,
         photoUrl: e.photoUrl,
+        verified: verified,
       ),
     );
   }

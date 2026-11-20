@@ -21,9 +21,11 @@ class AiPlacesService {
     required List<ExploreLocation> nearby,
     UserPreferences? preferences,
   }) async {
-    if (nearby.isEmpty) return 'No nearby locations found to recommend.';
+    // Mystery places are never sent to the AI: its answer would name them.
+    final candidates = nearby.where((l) => !l.isMystery).toList();
+    if (candidates.isEmpty) return 'No nearby locations found to recommend.';
 
-    final candidateList = nearby
+    final candidateList = candidates
         .take(8)
         .map((l) => '${l.name} (${l.category.label})')
         .join(', ');

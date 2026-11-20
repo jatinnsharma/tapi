@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:uuid/uuid.dart';
@@ -10,6 +11,8 @@ import '../../auth/application/auth_service.dart';
 import '../../tracking/application/tracking_service.dart';
 import '../data/social_repository.dart';
 import '../domain/group_adventure.dart';
+import '../../../core/ui/confirm_destructive.dart';
+import '../../../core/ui/friendly_error.dart';
 
 final _publicAdventuresProvider =
     FutureProvider.autoDispose<List<GroupAdventure>>((ref) {
@@ -38,9 +41,7 @@ class GroupAdventuresScreen extends ConsumerWidget {
           child: EmptyStateCard(
             icon: Icons.cloud_off_rounded,
             title: 'Group Adventures are unavailable',
-            message:
-                'Firebase isn\'t configured yet, so Group Adventures are unavailable. '
-                'See PENDING_TASKS.md for setup steps.',
+            message: "Group adventures aren't available in this version of the app yet.",
           ),
         ),
       );
@@ -120,7 +121,7 @@ class GroupAdventuresScreen extends ConsumerWidget {
               error: (error, stack) => EmptyStateCard(
                 icon: Icons.cloud_off_rounded,
                 title: 'Could not load adventures',
-                message: '$error',
+                message: friendlyError(error),
                 actionLabel: 'Try again',
                 onAction: refresh,
               ),
@@ -189,13 +190,45 @@ class GroupAdventuresScreen extends ConsumerWidget {
                     labelText: 'Location / Trail',
                   ),
                 ),
+                // Real pickers, so every adventure has a valid, consistently
+                // written date and time.
                 TextField(
                   controller: dateController,
-                  decoration: const InputDecoration(labelText: 'Date'),
+                  readOnly: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Date',
+                    suffixIcon: Icon(Icons.calendar_today_outlined),
+                  ),
+                  onTap: () async {
+                    final today = DateUtils.dateOnly(DateTime.now());
+                    final picked = await showDatePicker(
+                      context: context,
+                      initialDate: today,
+                      firstDate: today,
+                      lastDate: today.add(const Duration(days: 365)),
+                    );
+                    if (picked != null) {
+                      dateController.text = DateFormat('EEE, d MMM yyyy')
+                          .format(picked);
+                    }
+                  },
                 ),
                 TextField(
                   controller: timeController,
-                  decoration: const InputDecoration(labelText: 'Time'),
+                  readOnly: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Time',
+                    suffixIcon: Icon(Icons.schedule_outlined),
+                  ),
+                  onTap: () async {
+                    final picked = await showTimePicker(
+                      context: context,
+                      initialTime: const TimeOfDay(hour: 7, minute: 0),
+                    );
+                    if (picked != null && context.mounted) {
+                      timeController.text = picked.format(context);
+                    }
+                  },
                 ),
                 TextField(
                   controller: meetingPointController,
@@ -366,6 +399,15 @@ class _GroupAdventureCard extends ConsumerWidget {
               if (isCreator)
                 OutlinedButton.icon(
                   onPressed: () async {
+                    final ok = await confirmDestructive(
+                      context,
+                      title: 'Cancel ${adventure.name}?',
+                      message:
+                          'Everyone who joined loses it, with its chat and '
+                          'live map. This can\'t be undone.',
+                      confirmLabel: 'Cancel adventure',
+                    );
+                    if (!ok) return;
                     await repository.deleteGroupAdventure(adventure.id);
                     onChanged();
                   },

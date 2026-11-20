@@ -7,6 +7,7 @@ import '../../../core/theme/components.dart';
 import '../../auth/application/auth_service.dart';
 import '../data/social_repository.dart';
 import '../domain/group_message.dart';
+import '../../../core/ui/friendly_error.dart';
 
 final _messagesProvider = StreamProvider.autoDispose
     .family<List<GroupMessage>, (ChatParent, String)>(
@@ -35,6 +36,9 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen> {
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
 
+  /// Messages shown last time, to tell when new ones arrived.
+  int _lastCount = 0;
+
   @override
   void dispose() {
     _controller.dispose();
@@ -47,11 +51,12 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen> {
     if (text.isEmpty) return;
     final user = ref.read(authStateProvider).value;
     if (user == null) return;
+    // Clear first, so sending feels instant.
+    _controller.clear();
 
     final profile = await ref
         .read(socialRepositoryProvider)
         .getProfile(user.uid);
-    _controller.clear();
 
     await ref
         .read(socialRepositoryProvider)
@@ -107,7 +112,7 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen> {
                 child: EmptyStateCard(
                   icon: Icons.cloud_off_rounded,
                   title: 'Could not load chat',
-                  message: '$error',
+                  message: friendlyError(error),
                 ),
               ),
               data: (messages) {
@@ -117,17 +122,31 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen> {
                     child: EmptyStateCard(
                       icon: Icons.chat_bubble_outline_rounded,
                       title: 'No messages yet',
-                      message: 'No messages yet. Say hi!',
+                      message: 'Say hi to get the conversation going.',
                     ),
                   );
                 }
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  if (_scrollController.hasClients) {
-                    _scrollController.jumpTo(
-                      _scrollController.position.maxScrollExtent,
-                    );
-                  }
-                });
+                // Follow new messages only when the reader is already at the
+                // bottom (or just sent one), so reading older messages isn't
+                // interrupted; the first load starts at the latest message.
+                final grew = messages.length != _lastCount;
+                final firstLoad = _lastCount == 0;
+                _lastCount = messages.length;
+                final wasAtBottom =
+                    !_scrollController.hasClients ||
+                    _scrollController.position.maxScrollExtent -
+                            _scrollController.position.pixels <
+                        80;
+                if (grew &&
+                    (firstLoad || wasAtBottom || messages.last.uid == myUid)) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (_scrollController.hasClients) {
+                      _scrollController.jumpTo(
+                        _scrollController.position.maxScrollExtent,
+                      );
+                    }
+                  });
+                }
                 return ListView.builder(
                   controller: _scrollController,
                   padding: AppSpacing.page,

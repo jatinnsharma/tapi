@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 
+import 'package:intl/intl.dart';
+
 import '../../../core/theme/app_theme.dart';
+import '../application/tracking_service.dart';
+import '../domain/trip_guard.dart';
 import '../domain/adventure_session.dart';
 
 class TripNotCountedChecklist extends StatelessWidget {
@@ -54,14 +58,22 @@ class TripNotCountedChecklist extends StatelessWidget {
             const SizedBox(height: 12),
             _ruleItem(
               icon: Icons.timer_outlined,
-              title: 'Minimum 200 m & 3 minutes',
-              description: 'A counted trip must cover at least 200 meters of trekking and last at least 3 minutes.',
+              title:
+                  'Minimum ${TripGuard.minCompletionMeters} m & '
+                  '${_minutes(TripGuard.minCompletionSeconds)}',
+              description:
+                  'A counted trip must cover at least '
+                  '${TripGuard.minCompletionMeters} meters on foot and last at '
+                  'least ${_minutes(TripGuard.minCompletionSeconds)}.',
             ),
             const SizedBox(height: 12),
             _ruleItem(
               icon: Icons.social_distance_rounded,
               title: 'Start distance from places',
-              description: 'You must start your adventure from at least 150 meters away from a target destination to count its visit.',
+              description:
+                  'Start at least '
+                  '${TripGuard.minStartDistanceMeters.round()} meters away '
+                  'from a place for reaching it to count.',
             ),
             const SizedBox(height: 12),
             _ruleItem(
@@ -73,7 +85,11 @@ class TripNotCountedChecklist extends StatelessWidget {
             _ruleItem(
               icon: Icons.lock_clock_rounded,
               title: 'Daily fair-play cap',
-              description: 'To keep exploration healthy and fair, each explorer can earn up to 500 XP per day from completed trips.',
+              description:
+                  'To keep it fair, you can earn up to '
+                  '${NumberFormat.decimalPattern('en_IN').format(TrackingService.dailyTripXpCap)} '
+                  'XP a day from trips. Each place pays XP once every '
+                  '${TrackingService.placeCooldown.inDays} days.',
             ),
             const SizedBox(height: 24),
             SizedBox(
@@ -142,8 +158,8 @@ class TripNotCountedChecklist extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final note = xpNotice ?? '';
-    final hasDistance = session.trekMeters >= 200;
-    final hasTime = session.trekSeconds >= 180;
+    final hasDistance = session.trekMeters >= TripGuard.minCompletionMeters;
+    final hasTime = session.trekSeconds >= TripGuard.minCompletionSeconds;
     final noGpsFlag = !note.contains('jump') && !note.contains('mock');
     final notStartedTooClose = !note.contains('started less than');
     final confirmedPhoto = !note.contains('confirmation photo');
@@ -180,12 +196,15 @@ class TripNotCountedChecklist extends StatelessWidget {
           const SizedBox(height: 10),
           _checkRow(
             passed: hasDistance,
-            label: 'Walked ≥ 200 m on trek (${session.trekMeters.round()} m)',
+            label:
+                'Walked ≥ ${TripGuard.minCompletionMeters} m on trek '
+                '(${session.trekMeters.round()} m)',
           ),
           _checkRow(
             passed: hasTime,
             label:
-                'Trek lasted ≥ 3 min (${session.trekSeconds ~/ 60}m ${session.trekSeconds % 60}s)',
+                'Trek lasted ≥ ${TripGuard.minCompletionSeconds ~/ 60} min '
+                '(${session.trekSeconds ~/ 60}m ${session.trekSeconds % 60}s)',
           ),
           _checkRow(
             passed: noGpsFlag,
@@ -194,7 +213,9 @@ class TripNotCountedChecklist extends StatelessWidget {
           if (!notStartedTooClose)
             _checkRow(
               passed: false,
-              label: 'Started > 150 m from destination place',
+              label:
+                  'Started ≥ ${TripGuard.minStartDistanceMeters.round()} m '
+                  'from the place',
             ),
           if (!confirmedPhoto)
             _checkRow(passed: false, label: 'Live photo taken at destination'),
@@ -260,4 +281,10 @@ class TripNotCountedChecklist extends StatelessWidget {
       ),
     );
   }
+}
+
+/// "2 minutes" / "1 minute" for a rule given in seconds.
+String _minutes(int seconds) {
+  final m = seconds ~/ 60;
+  return '$m ${m == 1 ? 'minute' : 'minutes'}';
 }

@@ -33,6 +33,7 @@ class Memory {
     this.durationSeconds,
     this.sharedId,
     this.visibility,
+    this.playbackSpeed,
   });
 
   final String id;
@@ -48,6 +49,12 @@ class Memory {
   /// Id of the online copy (`shared_memories/{sharedId}`), once shared.
   final String? sharedId;
   final MemoryVisibility? visibility;
+
+  /// Slow-motion videos play slowed in the app (0.25 or 0.5); null is
+  /// normal speed. The file itself is a normal, high-frame-rate video.
+  final double? playbackSpeed;
+
+  bool get isSlowMotion => (playbackSpeed ?? 1) < 1;
 
   bool get isShared => sharedId != null && visibility != null;
 
@@ -69,6 +76,7 @@ class Memory {
       durationSeconds: durationSeconds,
       sharedId: clearSharing ? null : (sharedId ?? this.sharedId),
       visibility: clearSharing ? null : (visibility ?? this.visibility),
+      playbackSpeed: playbackSpeed,
     );
   }
 
@@ -85,6 +93,7 @@ class Memory {
       'duration_seconds': durationSeconds,
       'shared_id': sharedId,
       'visibility': visibility?.name,
+      'playback_speed': playbackSpeed,
     };
   }
 
@@ -101,6 +110,7 @@ class Memory {
       durationSeconds: map['duration_seconds'] as int?,
       sharedId: map['shared_id'] as String?,
       visibility: MemoryVisibility.fromName(map['visibility']),
+      playbackSpeed: (map['playback_speed'] as num?)?.toDouble(),
     );
   }
 }

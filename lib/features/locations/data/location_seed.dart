@@ -16,7 +16,7 @@ final List<ExploreLocation> locationSeed = [
     mysteryHint: 'Old stone, recycled ceramic sculptures, hidden waterfalls, near Sector 1.',
     latitude: 30.7525,
     longitude: 76.8067,
-    xpReward: 150,
+    xpReward: 110, // The most any place pays (xp_rules.dart).
     neighborhood: 'Sector 1',
     city: 'Chandigarh',
     district: 'Chandigarh',

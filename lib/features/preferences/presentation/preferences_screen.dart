@@ -8,6 +8,7 @@ import '../../../core/theme/glass.dart';
 import '../application/preferences_service.dart';
 import '../domain/user_preferences.dart';
 import '../../notifications/application/reminder_settings_service.dart';
+import '../../../core/ui/friendly_error.dart';
 
 class PreferencesScreen extends ConsumerWidget {
   const PreferencesScreen({super.key});
@@ -49,7 +50,7 @@ class PreferencesScreen extends ConsumerWidget {
             EmptyStateCard(
               icon: Icons.cloud_off_rounded,
               title: 'Could not load preferences',
-              message: '$error',
+              message: friendlyError(error),
             ),
           ],
         ),
@@ -60,6 +61,9 @@ class PreferencesScreen extends ConsumerWidget {
               FadeSlideIn(
                 child: _PreferenceSection(
                   title: 'Interests',
+                  hint:
+                      'Shapes the AI suggestion on Home and starts the trip '
+                      'planner with matching interests.',
                   children: [
                     for (final interest in interestOptions)
                       CategoryChip(
@@ -72,6 +76,7 @@ class PreferencesScreen extends ConsumerWidget {
               ),
               _buildSingleChoiceSection(
                 title: 'Duration',
+                hint: 'How far "Around you" on Home looks, to begin with.',
                 delay: 60,
                 options: durationOptions,
                 selected: preferences.duration,
@@ -79,6 +84,9 @@ class PreferencesScreen extends ConsumerWidget {
               ),
               _buildSingleChoiceSection(
                 title: 'Difficulty',
+                hint:
+                    'Sets the trip planner\'s pace: easy is relaxed, '
+                    'hard is packed.',
                 delay: 120,
                 options: difficultyOptions,
                 selected: preferences.difficulty,
@@ -86,6 +94,7 @@ class PreferencesScreen extends ConsumerWidget {
               ),
               _buildSingleChoiceSection(
                 title: 'Social Preference',
+                hint: 'Sets "Who\'s going" in the trip planner.',
                 delay: 180,
                 options: socialPreferenceOptions,
                 selected: preferences.socialPreference,
@@ -114,6 +123,7 @@ class PreferencesScreen extends ConsumerWidget {
 
   Widget _buildSingleChoiceSection({
     required String title,
+    required String hint,
     required int delay,
     required List<String> options,
     required String? selected,
@@ -125,6 +135,7 @@ class PreferencesScreen extends ConsumerWidget {
         delay: Duration(milliseconds: delay),
         child: _PreferenceSection(
           title: title,
+          hint: hint,
           children: [
             for (final option in options)
               CategoryChip(
@@ -172,6 +183,20 @@ class _BatterySavingCard extends ConsumerWidget {
 class _RemindersCard extends ConsumerWidget {
   const _RemindersCard();
 
+  /// Tells the user why a reminder didn't turn on.
+  Future<void> _explainIfRefused(BuildContext context, Future<bool> set) async {
+    final messenger = ScaffoldMessenger.of(context);
+    if (await set) return;
+    messenger.showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Notifications are off for Tabi. Allow them in your phone '
+          'settings to get reminders.',
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final settings = ref.watch(reminderSettingsProvider);
@@ -204,11 +229,12 @@ class _RemindersCard extends ConsumerWidget {
               ),
             ),
             subtitle: const Text(
-              'Get a gentle reminder in the evening if your streak is at risk.',
+              'A reminder at 7 PM each day to keep your streak going.',
               style: TextStyle(color: AppTheme.inkMuted),
             ),
             value: settings.streakReminders,
-            onChanged: (val) => notifier.setStreakReminders(val),
+            onChanged: (val) =>
+                _explainIfRefused(context, notifier.setStreakReminders(val)),
           ),
           SwitchListTile(
             activeThumbColor: AppTheme.forest,
@@ -220,11 +246,12 @@ class _RemindersCard extends ConsumerWidget {
               ),
             ),
             subtitle: const Text(
-              'Notify when each day\'s new exploration challenge becomes available.',
+              'A reminder at 9 AM when the day\'s new challenge is ready.',
               style: TextStyle(color: AppTheme.inkMuted),
             ),
             value: settings.challengeReminders,
-            onChanged: (val) => notifier.setChallengeReminders(val),
+            onChanged: (val) =>
+                _explainIfRefused(context, notifier.setChallengeReminders(val)),
           ),
           SwitchListTile(
             activeThumbColor: AppTheme.forest,
@@ -236,11 +263,12 @@ class _RemindersCard extends ConsumerWidget {
               ),
             ),
             subtitle: const Text(
-              'Notify when friends complete adventures or challenge you.',
+              'A Sunday 11 AM nudge to see where your friends explored.',
               style: TextStyle(color: AppTheme.inkMuted),
             ),
             value: settings.socialReminders,
-            onChanged: (val) => notifier.setSocialReminders(val),
+            onChanged: (val) =>
+                _explainIfRefused(context, notifier.setSocialReminders(val)),
           ),
         ],
       ),
@@ -250,9 +278,16 @@ class _RemindersCard extends ConsumerWidget {
 
 /// Titled soft card holding a wrap of pill chips.
 class _PreferenceSection extends StatelessWidget {
-  const _PreferenceSection({required this.title, required this.children});
+  const _PreferenceSection({
+    required this.title,
+    required this.hint,
+    required this.children,
+  });
 
   final String title;
+
+  /// What the setting changes in the app.
+  final String hint;
   final List<Widget> children;
 
   @override
@@ -273,6 +308,11 @@ class _PreferenceSection extends StatelessWidget {
                 color: AppTheme.ink,
               ),
             ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            hint,
+            style: const TextStyle(fontSize: 13, color: AppTheme.inkMuted),
           ),
           const SizedBox(height: 12),
           Wrap(spacing: 10, runSpacing: 12, children: children),

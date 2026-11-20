@@ -24,7 +24,7 @@ class UserStats {
   int get levelNumber => ExplorerLevel.levelNumberForXp(totalXp);
   String get levelTitle => ExplorerLevel.forXp(totalXp).title;
   int get xpIntoLevel => ExplorerLevel.xpIntoCurrentLevel(totalXp);
-  int get xpForNextLevel => ExplorerLevel.xpForNextLevel();
+  int get xpForNextLevel => ExplorerLevel.xpForNextLevel(totalXp);
   double get levelProgress =>
       xpForNextLevel == 0 ? 0 : xpIntoLevel / xpForNextLevel;
 }

@@ -10,6 +10,8 @@ export const ARRIVAL_RADIUS_METERS = 40;
 /**
  * XP a place can pay, by kind of place. The server decides: the app's own
  * number is never trusted, so a modified app can't claim 5000 XP for a bench.
+ * Must equal the app's table (lib/core/config/xp_rules.dart); a Flutter test
+ * compares them.
  */
 export const PLACE_XP = Object.freeze({
   heritage: 80,
@@ -19,6 +21,12 @@ export const PLACE_XP = Object.freeze({
   viewpoint: 70,
   hiddenGem: 110,
   city: 50,
+  trek: 100,
+  mountain: 100,
+  waterfall: 90,
+  camping: 80,
+  food: 50,
+  mystery: 110,
 });
 export const DEFAULT_PLACE_XP = 50;
 

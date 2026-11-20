@@ -5,9 +5,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/components.dart';
 import '../../locations/domain/location.dart';
-import '../../map/cached_tile_provider.dart';
 import '../application/footprint_service.dart';
 import '../domain/footprint.dart';
+import '../../map/osm_tiles.dart';
+import '../../../core/ui/friendly_error.dart';
 
 /// Another explorer's exploration footprint: every route they've completed
 /// and every place they've visited, on one map. Only shows what their
@@ -34,7 +35,7 @@ class FootprintScreen extends ConsumerWidget {
           child: EmptyStateCard(
             icon: Icons.cloud_off_rounded,
             title: 'Could not load this map',
-            message: '$error',
+            message: friendlyError(error),
             actionLabel: 'Try again',
             onAction: () => ref.invalidate(footprintOfProvider(uid)),
           ),
@@ -99,11 +100,7 @@ class _FootprintMap extends StatelessWidget {
             initialZoom: 14,
           ),
           children: [
-            TileLayer(
-              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-              userAgentPackageName: 'com.example.real_world_exploration',
-              tileProvider: CachedTileProvider(),
-            ),
+            osmTileLayer(),
             PolylineLayer(
               polylines: [
                 for (final route in routes)
@@ -128,6 +125,7 @@ class _FootprintMap extends StatelessWidget {
                   ),
               ],
             ),
+            const OsmAttribution(),
           ],
         ),
         Positioned(

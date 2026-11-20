@@ -1,49 +1,41 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 
+import '../../core/theme/app_components.dart';
 import '../../core/theme/app_theme.dart';
-import 'rank_frame.dart';
 import '../../core/theme/components.dart';
 import '../../core/theme/glass.dart';
 import '../auth/application/display_name_provider.dart';
-import '../journal/presentation/adventure_detail_screen.dart';
+import '../challenges/presentation/streak_flame_badge.dart';
 import '../locations/data/location_repository.dart';
 import '../locations/domain/location.dart';
+import '../passport/application/passport_service.dart';
+import '../tracking/data/adventure_repository.dart';
 import '../tracking/domain/adventure_session.dart';
-import 'application/user_profile_service.dart';
 import 'application/achievement_service.dart';
+import 'application/user_profile_service.dart';
+import 'domain/explorer_level.dart';
+import 'rank_frame.dart';
+import 'rank_rewards_card.dart';
 
 const _pagePadding = EdgeInsets.symmetric(horizontal: 20);
 
-class _RegionalCompletion {
-  const _RegionalCompletion({
-    required this.neighborhoods,
-    required this.cities,
-    required this.districts,
-    required this.regions,
-    required this.countries,
-  });
+/// The city you've explored most, for the one Exploration row on You.
+final _topCityProvider = FutureProvider.autoDispose<RegionProgress?>((
+  ref,
+) async {
+  final cities = await ref
+      .watch(locationRepositoryProvider)
+      .getCityCompletion();
+  final started = cities.where((c) => c.discovered > 0).toList()
+    ..sort((a, b) => b.discovered.compareTo(a.discovered));
+  return started.firstOrNull;
+});
 
-  final List<RegionProgress> neighborhoods;
-  final List<RegionProgress> cities;
-  final List<RegionProgress> districts;
-  final List<RegionProgress> regions;
-  final List<RegionProgress> countries;
-}
-
-final _regionalCompletionProvider =
-    FutureProvider.autoDispose<_RegionalCompletion>((ref) async {
-      final repository = ref.watch(locationRepositoryProvider);
-      return _RegionalCompletion(
-        neighborhoods: await repository.getNeighborhoodCompletion(),
-        cities: await repository.getCityCompletion(),
-        districts: await repository.getDistrictCompletion(),
-        regions: await repository.getRegionCompletion(),
-        countries: await repository.getCountryCompletion(),
-      );
-    });
-
+/// You: who you are and how far you've come (one rank meter), your
+/// collections, where you've explored, recent trips, and your records.
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
 
@@ -51,13 +43,16 @@ class ProfileScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final statsAsync = ref.watch(userProfileProvider);
     final name = ref.watch(displayNameProvider);
+    final text = Theme.of(context).textTheme;
 
     return Scaffold(
       body: SafeArea(
         bottom: false,
         child: RefreshIndicator(
-          color: AppTheme.forest,
-          onRefresh: () async => ref.invalidate(userProfileProvider),
+          onRefresh: () async {
+            ref.invalidate(userProfileProvider);
+            ref.invalidate(_topCityProvider);
+          },
           child: ListView(
             padding: const EdgeInsets.only(top: 12, bottom: 32),
             children: [
@@ -65,46 +60,27 @@ class ProfileScreen extends ConsumerWidget {
                 padding: _pagePadding,
                 child: Row(
                   children: [
-                    const Expanded(
-                      child: Text(
-                        'Passport',
-                        style: TextStyle(
-                          fontSize: 36,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -1,
-                          color: AppTheme.ink,
-                        ),
-                      ),
-                    ),
-                    RoundIconButton(
-                      icon: Icons.menu_book_outlined,
-                      tooltip: 'Adventure Journal',
-                      onPressed: () => context.push('/journal'),
-                    ),
-                    const SizedBox(width: 10),
-                    RoundIconButton(
-                      icon: Icons.tune_rounded,
-                      tooltip: 'Exploration Preferences',
-                      onPressed: () => context.push('/preferences'),
+                    Expanded(child: Text('You', style: text.headlineLarge)),
+                    AppIconButton(
+                      icon: Icons.settings_outlined,
+                      tooltip: 'Settings',
+                      onPressed: () => context.push('/settings'),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
               statsAsync.when(
                 loading: () => const _PassportSkeleton(),
-                error: (error, stack) => Padding(
+                error: (error, _) => Padding(
                   padding: _pagePadding,
-                  child: EmptyStateCard(
-                    icon: Icons.cloud_off_rounded,
-                    title: 'Could not load profile',
-                    message: '$error',
-                    actionLabel: 'Try again',
-                    onAction: () => ref.invalidate(userProfileProvider),
+                  child: ErrorState(
+                    error: error,
+                    onRetry: () => ref.invalidate(userProfileProvider),
                   ),
                 ),
                 data: (stats) => Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     FadeSlideIn(
                       child: Padding(
@@ -112,46 +88,36 @@ class ProfileScreen extends ConsumerWidget {
                         child: _PassportHero(stats: stats, name: name),
                       ),
                     ),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 12),
                     FadeSlideIn(
-                      delay: const Duration(milliseconds: 80),
+                      delay: const Duration(milliseconds: 60),
                       child: Padding(
                         padding: _pagePadding,
                         child: _StatsRow(stats: stats),
                       ),
                     ),
-                    const SizedBox(height: 10),
-                    FadeSlideIn(
-                      delay: const Duration(milliseconds: 140),
+                    const SizedBox(height: 8),
+                    const FadeSlideIn(
+                      delay: Duration(milliseconds: 100),
                       child: Padding(
                         padding: _pagePadding,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const SectionHeader(title: 'Achievements'),
-                            const _AchievementsCard(),
-                          ],
-                        ),
+                        child: _Collections(),
                       ),
                     ),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 8),
+                    const Padding(
+                      padding: _pagePadding,
+                      child: _ExplorationSection(),
+                    ),
                     Padding(
                       padding: _pagePadding,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const SectionHeader(title: 'Regional Exploration'),
-                          _buildRegionalCompletion(ref),
-                          const SectionHeader(
-                            title: 'Recent Adventures',
-                            padding: EdgeInsets.only(top: 22, bottom: 12),
-                          ),
-                          _buildRecentAdventures(
-                            context,
-                            stats.recentAdventures,
-                          ),
-                        ],
-                      ),
+                      child: _RecentTrips(adventures: stats.recentAdventures),
+                    ),
+                    const SizedBox(height: 8),
+                    // Everything you've recorded, one tap from You.
+                    const Padding(
+                      padding: _pagePadding,
+                      child: _YourRecordsGroup(),
                     ),
                   ],
                 ),
@@ -162,136 +128,12 @@ class ProfileScreen extends ConsumerWidget {
       ),
     );
   }
-
-  Widget _buildRegionalCompletion(WidgetRef ref) {
-    final completionAsync = ref.watch(_regionalCompletionProvider);
-    return completionAsync.when(
-      loading: () => const Shimmer(child: SkeletonBox(height: 70, radius: 24)),
-      error: (error, stack) => EmptyStateCard(
-        icon: Icons.public_off_outlined,
-        title: 'Could not load regional progress',
-        message: '$error',
-      ),
-      data: (completion) {
-        if (completion.cities.isEmpty) {
-          return const EmptyStateCard(
-            icon: Icons.public_outlined,
-            title: 'No locations discovered yet',
-            message: 'Start exploring and your regions will fill up here.',
-          );
-        }
-        // Matches the spec's §28 full regional hierarchy:
-        // Neighborhood → City → District → Region(State) → Country
-        return Column(
-          children: [
-            for (final neighborhood in completion.neighborhoods)
-              _RegionRow(progress: neighborhood),
-            const SizedBox(height: 8),
-            for (final city in completion.cities)
-              _RegionRow(progress: city, emphasize: true),
-            const SizedBox(height: 8),
-            for (final district in completion.districts)
-              _RegionRow(progress: district, emphasize: true),
-            const SizedBox(height: 8),
-            for (final region in completion.regions)
-              _RegionRow(progress: region, emphasize: true),
-            const SizedBox(height: 8),
-            for (final country in completion.countries)
-              _RegionRow(progress: country, emphasize: true),
-          ],
-        );
-      },
-    );
-  }
-
-  Widget _buildRecentAdventures(
-    BuildContext context,
-    List<AdventureSession> adventures,
-  ) {
-    if (adventures.isEmpty) {
-      return const EmptyStateCard(
-        icon: Icons.hiking_outlined,
-        title: 'No adventures yet',
-        message: 'Start one from the Explore tab!',
-      );
-    }
-
-    return Column(
-      children: [
-        for (final adventure in adventures)
-          SoftCard(
-            margin: const EdgeInsets.only(bottom: 12),
-            padding: const EdgeInsets.all(12),
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) =>
-                      AdventureDetailScreen(adventureId: adventure.id),
-                ),
-              );
-            },
-            child: Row(
-              children: [
-                Container(
-                  width: 52,
-                  height: 52,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(16),
-                    gradient: const LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [AppTheme.emerald, AppTheme.forest],
-                    ),
-                  ),
-                  child: const Icon(Icons.forest, color: Colors.white),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        adventure.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                          color: AppTheme.ink,
-                        ),
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        '${_relativeDate(adventure.startedAt)} • ${(adventure.trekMeters / 1000).toStringAsFixed(1)} km trek • +${adventure.xpEarned} XP',
-                        style: const TextStyle(
-                          fontSize: 12.5,
-                          color: AppTheme.inkMuted,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const Icon(
-                  Icons.chevron_right_rounded,
-                  color: AppTheme.inkMuted,
-                ),
-              ],
-            ),
-          ),
-      ],
-    );
-  }
-
-  String _relativeDate(DateTime date) {
-    final now = DateTime.now();
-    final difference = now.difference(date);
-    if (difference.inDays <= 0) return 'Today';
-    if (difference.inDays == 1) return 'Yesterday';
-    return '${difference.inDays} days ago';
-  }
 }
 
-/// Deep-green hero: avatar, level and an amber XP progress bar.
+String _formatXp(int xp) => NumberFormat.decimalPattern().format(xp);
+
+/// Identity and the one progress meter: your rank, the bar to the next
+/// one, and what it unlocks. XP shows once, as what feeds the bar.
 class _PassportHero extends StatelessWidget {
   const _PassportHero({required this.stats, required this.name});
 
@@ -300,7 +142,13 @@ class _PassportHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final toNext = stats.xpForNextLevel - stats.xpIntoLevel;
+    final text = Theme.of(context).textTheme;
+    final onHero = Theme.of(context).colorScheme.onPrimary;
+    final muted = onHero.withValues(alpha: 0.85);
+    final rank = ExplorerLevel.rankProgress(stats.totalXp);
+    final next = rank.next;
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
+
     return HeroCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -317,62 +165,80 @@ class _PassportHero extends StatelessWidget {
                       name ?? 'Explorer',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 24,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.4,
-                      ),
+                      style: text.titleLarge?.copyWith(color: onHero),
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'Level ${stats.levelNumber} · ${stats.levelTitle}',
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.85),
-                        fontSize: 14.5,
-                        fontWeight: FontWeight.w500,
-                      ),
+                      '${rank.current.title} · Level ${stats.levelNumber}',
+                      style: text.bodyMedium?.copyWith(color: muted),
                     ),
                   ],
                 ),
               ),
+              const StreakFlameBadge(),
             ],
           ),
-          const SizedBox(height: 22),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                '${stats.totalXp} XP',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w800,
-                  fontSize: 14,
+          const SizedBox(height: 20),
+          Semantics(
+            label: next == null
+                ? '${_formatXp(stats.totalXp)} XP. Top rank reached.'
+                : '${_formatXp(stats.totalXp)} XP. '
+                      '${_formatXp(rank.xpToNext)} XP to ${next.title}.',
+            excludeSemantics: true,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      '${_formatXp(stats.totalXp)} XP',
+                      style: text.titleSmall?.copyWith(color: onHero),
+                    ),
+                    const Spacer(),
+                    Flexible(
+                      child: Text(
+                        next == null
+                            ? 'Top rank'
+                            : '${_formatXp(rank.xpToNext)} XP to ${next.title}',
+                        textAlign: TextAlign.end,
+                        style: text.labelLarge?.copyWith(color: muted),
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-              Text(
-                '$toNext XP to Level ${stats.levelNumber + 1}',
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.85),
-                  fontWeight: FontWeight.w700,
-                  fontSize: 14,
+                const SizedBox(height: 8),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(AppRadius.sm),
+                  child: TweenAnimationBuilder<double>(
+                    tween: Tween(begin: 0, end: rank.progress.clamp(0.0, 1.0)),
+                    duration: reduceMotion
+                        ? Duration.zero
+                        : const Duration(milliseconds: 900),
+                    curve: AppMotion.curve,
+                    builder: (context, value, _) => LinearProgressIndicator(
+                      value: value,
+                      minHeight: 10,
+                      backgroundColor: onHero.withValues(alpha: 0.22),
+                      valueColor: const AlwaysStoppedAnimation(AppTheme.amber),
+                    ),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
           const SizedBox(height: 8),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(10),
-            child: TweenAnimationBuilder<double>(
-              tween: Tween(begin: 0, end: stats.levelProgress.clamp(0.0, 1.0)),
-              duration: const Duration(milliseconds: 900),
-              curve: Curves.easeOutCubic,
-              builder: (context, value, _) => LinearProgressIndicator(
-                value: value,
-                minHeight: 10,
-                backgroundColor: Colors.white.withValues(alpha: 0.22),
-                valueColor: const AlwaysStoppedAnimation(AppTheme.amber),
-              ),
+          TextButton.icon(
+            style: TextButton.styleFrom(
+              foregroundColor: onHero,
+              padding: EdgeInsets.zero,
+              minimumSize: const Size(0, 44),
+            ),
+            onPressed: () => showRankStylesSheet(context, name: name),
+            icon: const Icon(Icons.workspace_premium_outlined, size: 20),
+            label: Text(
+              next == null
+                  ? 'Rank & styles'
+                  : 'Rank & styles · ${next.title} unlocks a new frame',
             ),
           ),
         ],
@@ -381,201 +247,342 @@ class _PassportHero extends StatelessWidget {
   }
 }
 
-class _StatsRow extends StatelessWidget {
+/// Three lifetime numbers in one card: trips, distance on foot, places.
+class _StatsRow extends ConsumerWidget {
   const _StatsRow({required this.stats});
 
   final UserStats stats;
 
   @override
-  Widget build(BuildContext context) {
-    return Row(
+  Widget build(BuildContext context, WidgetRef ref) {
+    final places = ref.watch(visitedPlaceIdsProvider).value?.length;
+    final colors = AppColors.of(context);
+    Widget stat(String value, String label) => Expanded(
+      child: Semantics(
+        label: '$value $label',
+        excludeSemantics: true,
+        child: Column(
+          children: [
+            Text(value, style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodySmall
+                  ?.copyWith(color: colors.textSecondary),
+            ),
+          ],
+        ),
+      ),
+    );
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+      decoration: BoxDecoration(
+        color: colors.surface,
+        borderRadius: AppRadius.card,
+        border: Border.all(color: colors.border),
+      ),
+      child: Row(
+        children: [
+          stat('${stats.completedAdventureCount}', 'Trips'),
+          stat('${stats.totalDistanceKm.toStringAsFixed(1)} km', 'On foot'),
+          stat(places == null ? '–' : '$places', 'Places visited'),
+        ],
+      ),
+    );
+  }
+}
+
+/// Achievements, stamps and the exploration map as three equal tiles.
+class _Collections extends ConsumerWidget {
+  const _Collections();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final achievements = ref.watch(achievementsProvider).value;
+    final earned = achievements?.fold<int>(0, (n, a) => n + a.earnedStars);
+    final total = (achievements?.length ?? 0) * 3;
+    final waitingXp =
+        achievements?.fold<int>(0, (n, a) => n + a.claimableXp) ?? 0;
+    final stamps = ref.watch(passportStampsProvider).value?.length;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: StatTile(
-            value: '${stats.completedAdventureCount}',
-            label: 'Adventures',
+        const _SectionTitle('Collections'),
+        IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: CollectionTile(
+                  icon: Icons.emoji_events_outlined,
+                  value: earned == null ? '–' : '$earned/$total',
+                  label: 'Stars',
+                  badge: waitingXp > 0 ? 'Claim' : null,
+                  onTap: () => context.push('/achievements'),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: CollectionTile(
+                  icon: Icons.approval_outlined,
+                  value: stamps == null ? '–' : '$stamps',
+                  label: stamps == 1 ? 'City stamp' : 'City stamps',
+                  onTap: () => context.push('/passport-stamps'),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: CollectionTile(
+                  icon: Icons.route_outlined,
+                  value: 'Map',
+                  label: 'Routes & poster',
+                  onTap: () => context.push('/heatmap'),
+                ),
+              ),
+            ],
           ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: StatTile(
-            value: '${stats.totalDistanceKm.toStringAsFixed(1)} km',
-            label: 'Trekked',
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: StatTile(
-            value: _compactSteps(stats.totalTrekSteps),
-            label: 'Steps',
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: StatTile(value: '${stats.totalXp}', label: 'Total XP'),
         ),
       ],
     );
   }
 }
 
-/// "950", "12.4k", "1.2M": fits a small stat tile.
-String _compactSteps(int steps) {
-  if (steps < 1000) return '$steps';
-  if (steps < 1000000) {
-    final k = steps / 1000;
-    return '${k.toStringAsFixed(k < 100 ? 1 : 0)}k';
-  }
-  return '${(steps / 1000000).toStringAsFixed(1)}M';
-}
+/// One collection on You: an icon, a number and what it counts, with an
+/// optional badge ("Claim").
+class CollectionTile extends StatelessWidget {
+  const CollectionTile({
+    super.key,
+    required this.icon,
+    required this.value,
+    required this.label,
+    required this.onTap,
+    this.badge,
+  });
 
-/// Passport entry to the Achievements screen: stars earned so far, and a
-/// badge with the XP waiting to be claimed.
-class _AchievementsCard extends ConsumerWidget {
-  const _AchievementsCard();
+  final IconData icon;
+  final String value;
+  final String label;
+  final String? badge;
+  final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final achievements = ref.watch(achievementsProvider).value;
-    final earned = achievements?.fold<int>(0, (n, a) => n + a.earnedStars) ?? 0;
-    final total = (achievements?.length ?? 0) * 3;
-    final waitingXp =
-        achievements?.fold<int>(0, (n, a) => n + a.claimableXp) ?? 0;
-
-    return SoftCard(
-      padding: const EdgeInsets.all(16),
-      onTap: () => context.push('/achievements'),
-      child: Row(
-        children: [
-          Container(
-            width: 52,
-            height: 52,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: AppTheme.amber.withValues(alpha: 0.2),
-            ),
-            child: const Icon(
-              Icons.emoji_events_rounded,
-              color: AppTheme.amberText,
-              size: 28,
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    final colors = AppColors.of(context);
+    return Semantics(
+      button: true,
+      label: '$value $label${badge == null ? '' : ', $badge'}',
+      excludeSemantics: true,
+      child: Material(
+        color: colors.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: AppRadius.card,
+          side: BorderSide(color: colors.border),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  achievements == null
-                      ? 'Achievements'
-                      : '$earned / $total stars',
-                  style: const TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w800,
-                    color: AppTheme.ink,
-                  ),
+                Row(
+                  children: [
+                    Icon(icon, color: Theme.of(context).colorScheme.primary),
+                    const Spacer(),
+                    if (badge != null) Tag(badge!, tone: TagTone.reward),
+                  ],
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: 10),
                 Text(
-                  waitingXp > 0
-                      ? '$waitingXp XP waiting to be claimed!'
-                      : 'Earn stars, claim bonus XP',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: waitingXp > 0
-                        ? FontWeight.w800
-                        : FontWeight.w400,
-                    color: waitingXp > 0
-                        ? AppTheme.amberText
-                        : AppTheme.inkMuted,
-                  ),
+                  value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: text.titleMedium,
+                ),
+                Text(
+                  label,
+                  style: text.bodySmall?.copyWith(color: colors.textSecondary),
                 ),
               ],
             ),
           ),
-          if (waitingXp > 0)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: AppTheme.amber,
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: const Text(
-                'Claim',
-                style: TextStyle(
-                  fontWeight: FontWeight.w800,
-                  color: AppTheme.ink,
-                  fontSize: 13,
-                ),
-              ),
-            )
-          else
-            const Icon(Icons.chevron_right_rounded, color: AppTheme.inkMuted),
-        ],
+        ),
       ),
     );
   }
 }
 
-class _RegionRow extends StatelessWidget {
-  const _RegionRow({required this.progress, this.emphasize = false});
+/// Your most-explored city as one progress row, with every region a tap
+/// away. Nothing explored yet: a short invitation instead of 0% bars.
+class _ExplorationSection extends ConsumerWidget {
+  const _ExplorationSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final top = ref.watch(_topCityProvider);
+    final colors = AppColors.of(context);
+    final text = Theme.of(context).textTheme;
+    final city = top.value;
+    if (top.isLoading && city == null) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _SectionTitle(
+          'Exploration',
+          action: city == null
+              ? null
+              : AppButton.tertiary(
+                  label: 'All regions',
+                  onPressed: () => context.push('/regions'),
+                ),
+        ),
+        if (city == null)
+          Text(
+            'Places you discover fill in your map here.',
+            style: text.bodyMedium?.copyWith(color: colors.textSecondary),
+          )
+        else
+          RegionProgressRow(progress: city),
+      ],
+    );
+  }
+}
+
+/// A region's name, how many of its places you've found, and a bar.
+class RegionProgressRow extends StatelessWidget {
+  const RegionProgressRow({super.key, required this.progress});
 
   final RegionProgress progress;
-  final bool emphasize;
 
   @override
   Widget build(BuildContext context) {
-    return SoftCard(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
-      radius: 20,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Text(
-                  progress.name,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontWeight: emphasize ? FontWeight.w800 : FontWeight.w600,
-                    fontSize: 15,
-                    color: AppTheme.ink,
+    final text = Theme.of(context).textTheme;
+    final colors = AppColors.of(context);
+    final percent = (progress.percent * 100).round();
+    return Semantics(
+      label:
+          '${progress.name}: ${progress.discovered} of ${progress.total} '
+          'places, $percent percent',
+      excludeSemantics: true,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    progress.name,
+                    overflow: TextOverflow.ellipsis,
+                    style: text.titleSmall,
                   ),
                 ),
-              ),
-              Text(
-                '${progress.discovered} / ${progress.total}',
-                style: const TextStyle(
-                  fontWeight: FontWeight.w700,
-                  color: AppTheme.inkMuted,
+                Text(
+                  '${progress.discovered} of ${progress.total} places',
+                  style: text.bodySmall?.copyWith(color: colors.textSecondary),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: LinearProgressIndicator(
-              value: progress.percent,
-              minHeight: 8,
-              backgroundColor: AppTheme.primaryGreen.withValues(alpha: 0.12),
-              valueColor: AlwaysStoppedAnimation(
-                emphasize ? AppTheme.emerald : AppTheme.amber,
+              ],
+            ),
+            const SizedBox(height: 6),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(AppRadius.sm),
+              child: LinearProgressIndicator(
+                value: progress.percent,
+                minHeight: 8,
+                backgroundColor: colors.surfaceMuted,
               ),
             ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            '${(progress.percent * 100).toStringAsFixed(1)}% explored',
-            style: const TextStyle(fontSize: 12, color: AppTheme.inkMuted),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
+}
+
+/// The last three trips, each opening its journal page.
+class _RecentTrips extends StatelessWidget {
+  const _RecentTrips({required this.adventures});
+
+  final List<AdventureSession> adventures;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = AppColors.of(context);
+    final text = Theme.of(context).textTheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const _SectionTitle('Recent trips'),
+        if (adventures.isEmpty)
+          Text(
+            'Your trips show up here after you finish one.',
+            style: text.bodyMedium?.copyWith(color: colors.textSecondary),
+          )
+        else
+          AppListGroup(
+            children: [
+              for (final adventure in adventures.take(3))
+                AppListTile(
+                  leading: Icon(
+                    Icons.hiking_rounded,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  title: adventure.title,
+                  subtitle: [
+                    tripDateLabel(adventure.startedAt, DateTime.now()),
+                    '${(adventure.trekMeters / 1000).toStringAsFixed(1)} km '
+                        'on foot',
+                    if (adventure.xpEarned > 0) '+${adventure.xpEarned} XP',
+                  ].join(' · '),
+                  trailing: Icon(
+                    Icons.chevron_right_rounded,
+                    color: colors.textSecondary,
+                  ),
+                  onTap: () => context.push('/journal/${adventure.id}'),
+                ),
+            ],
+          ),
+      ],
+    );
+  }
+}
+
+/// "Today", "Yesterday", "3 days ago" for the last week, then a date
+/// ("12 Mar", or "12 Mar 2025" in another year).
+String tripDateLabel(DateTime date, DateTime now) {
+  final day = DateTime(date.year, date.month, date.day);
+  final today = DateTime(now.year, now.month, now.day);
+  final days = today.difference(day).inDays;
+  if (days <= 0) return 'Today';
+  if (days == 1) return 'Yesterday';
+  if (days < 7) return '$days days ago';
+  return DateFormat(date.year == now.year ? 'd MMM' : 'd MMM y').format(date);
+}
+
+class _SectionTitle extends StatelessWidget {
+  const _SectionTitle(this.title, {this.action});
+
+  final String title;
+  final Widget? action;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(top: 16, bottom: 8),
+    child: Row(
+      children: [
+        Expanded(
+          child: Text(title, style: Theme.of(context).textTheme.titleMedium),
+        ),
+        ?action,
+      ],
+    ),
+  );
 }
 
 class _PassportSkeleton extends StatelessWidget {
@@ -588,22 +595,66 @@ class _PassportSkeleton extends StatelessWidget {
       child: Shimmer(
         child: Column(
           children: [
-            SkeletonBox(height: 170, radius: 32),
-            SizedBox(height: 14),
+            SkeletonBox(height: 190, radius: AppRadius.lg),
+            SizedBox(height: 12),
+            SkeletonBox(height: 72, radius: AppRadius.md),
+            SizedBox(height: 24),
             Row(
               children: [
-                Expanded(child: SkeletonBox(height: 82, radius: 22)),
-                SizedBox(width: 10),
-                Expanded(child: SkeletonBox(height: 82, radius: 22)),
-                SizedBox(width: 10),
-                Expanded(child: SkeletonBox(height: 82, radius: 22)),
+                Expanded(child: SkeletonBox(height: 96, radius: AppRadius.md)),
+                SizedBox(width: 8),
+                Expanded(child: SkeletonBox(height: 96, radius: AppRadius.md)),
+                SizedBox(width: 8),
+                Expanded(child: SkeletonBox(height: 96, radius: AppRadius.md)),
               ],
             ),
-            SizedBox(height: 24),
-            SkeletonBox(height: 120, radius: 24),
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Links to the places your trips are kept: journal, photos, calendar.
+class _YourRecordsGroup extends StatelessWidget {
+  const _YourRecordsGroup();
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = AppColors.of(context);
+    Widget row(IconData icon, String title, String subtitle, String path) =>
+        AppListTile(
+          leading: Icon(icon, color: Theme.of(context).colorScheme.primary),
+          title: title,
+          subtitle: subtitle,
+          trailing: Icon(
+            Icons.chevron_right_rounded,
+            color: colors.textSecondary,
+          ),
+          onTap: () => context.push(path),
+        );
+    return AppListGroup(
+      title: 'YOUR TRIPS & PHOTOS',
+      children: [
+        row(
+          Icons.menu_book_outlined,
+          'Journal',
+          'Every trip you\'ve tracked',
+          '/journal',
+        ),
+        row(
+          Icons.photo_library_outlined,
+          'Memories',
+          'Photos from your trips',
+          '/memories',
+        ),
+        row(
+          Icons.calendar_month_outlined,
+          'Calendar',
+          'Your trips by date',
+          '/calendar',
+        ),
+      ],
     );
   }
 }

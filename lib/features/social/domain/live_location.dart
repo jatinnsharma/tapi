@@ -8,6 +8,8 @@ class LiveLocation {
     required this.updatedAt,
     required this.sharing,
     this.groupAdventureId,
+    this.statusNote,
+    this.statusAt,
   });
 
   final String uid;
@@ -22,6 +24,10 @@ class LiveLocation {
   /// lets every member of that group see this position, not just friends.
   final String? groupAdventureId;
 
+  /// A quick ping to the group ("Stopping for chai"), and when it was sent.
+  final String? statusNote;
+  final DateTime? statusAt;
+
   Map<String, Object?> toMap() {
     return {
       'uid': uid,
@@ -32,6 +38,8 @@ class LiveLocation {
       'updatedAt': updatedAt.toIso8601String(),
       'sharing': sharing,
       'groupAdventureId': groupAdventureId,
+      'statusNote': ?statusNote,
+      'statusAt': ?statusAt?.toIso8601String(),
     };
   }
 
@@ -45,6 +53,10 @@ class LiveLocation {
       updatedAt: DateTime.parse(map['updatedAt'] as String),
       sharing: map['sharing'] as bool,
       groupAdventureId: map['groupAdventureId'] as String?,
+      statusNote: map['statusNote'] as String?,
+      statusAt: map['statusAt'] == null
+          ? null
+          : DateTime.tryParse(map['statusAt'] as String),
     );
   }
 }

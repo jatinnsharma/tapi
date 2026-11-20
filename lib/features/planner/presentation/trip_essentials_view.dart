@@ -13,6 +13,9 @@ import '../../weather/domain/weather_model.dart';
 import '../data/saved_trips_repository.dart';
 import '../domain/trip_extras.dart';
 import '../domain/trip_plan.dart';
+import '../../../core/theme/app_components.dart';
+
+import 'package:go_router/go_router.dart';
 
 typedef _ForecastKey = ({double lat, double lng, DateTime start, int days});
 
@@ -87,17 +90,10 @@ class _CardTitle extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(icon, size: 20, color: AppTheme.primary),
+        Icon(icon, size: 20, color: Theme.of(context).colorScheme.primary),
         const SizedBox(width: 8),
         Expanded(
-          child: Text(
-            title,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w800,
-              color: AppTheme.ink,
-            ),
-          ),
+          child: Text(title, style: Theme.of(context).textTheme.titleMedium),
         ),
         ?trailing,
       ],
@@ -105,11 +101,7 @@ class _CardTitle extends StatelessWidget {
   }
 }
 
-const _mutedStyle = TextStyle(
-  fontSize: 12.5,
-  color: AppTheme.inkMuted,
-  height: 1.35,
-);
+const _mutedStyle = TextStyle(color: AppTheme.inkMuted, height: 1.35);
 
 // ---------------------------------------------------------------------------
 // Dates & weather
@@ -152,25 +144,32 @@ class _DatesCard extends ConsumerWidget {
           _CardTitle(
             Icons.event_outlined,
             'Dates & weather',
-            trailing: TextButton(
-              onPressed: () => _pickDate(context),
-              child: Text(start == null ? 'Set dates' : 'Change'),
-            ),
+            trailing: start == null
+                ? null
+                : AppButton.tertiary(
+                    label: 'Change',
+                    onPressed: () => _pickDate(context),
+                  ),
           ),
           const SizedBox(height: 6),
-          if (start == null)
+          // Dates unlock the forecast and the season's packing list, so
+          // they're the first thing to ask for.
+          if (start == null) ...[
             const Text(
-              'Add your travel dates to see the forecast and a packing list for the season.',
+              'Add your travel dates to see the forecast and a packing list '
+              'for the season.',
               style: _mutedStyle,
-            )
-          else ...[
+            ),
+            const SizedBox(height: 12),
+            AppButton(
+              label: 'Add dates',
+              icon: Icons.event_outlined,
+              onPressed: () => _pickDate(context),
+            ),
+          ] else ...[
             Text(
               '${fmt.format(start)} – ${fmt.format(start.add(Duration(days: plan.daysCount - 1)))}',
-              style: const TextStyle(
-                fontSize: 14.5,
-                fontWeight: FontWeight.w700,
-                color: AppTheme.ink,
-              ),
+              style: Theme.of(context).textTheme.titleSmall,
             ),
             const SizedBox(height: 6),
             Text(seasonNote(start), style: _mutedStyle),
@@ -224,55 +223,55 @@ class _Forecast extends ConsumerWidget {
             style: _mutedStyle,
           );
         }
-        return SizedBox(
-          height: 104,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: days.length,
-            separatorBuilder: (_, _) => const SizedBox(width: 8),
-            itemBuilder: (context, i) {
-              final d = days[i];
-              return Container(
-                width: 84,
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: AppTheme.sage.withValues(alpha: 0.35),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      DateFormat('EEE d').format(d.date),
-                      style: const TextStyle(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w700,
-                        color: AppTheme.ink,
-                      ),
+        final text = Theme.of(context).textTheme;
+        final colors = AppColors.of(context);
+        // Tiles grow with the text size instead of a fixed height.
+        return SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (final (i, d) in days.indexed) ...[
+                  if (i > 0) const SizedBox(width: 8),
+                  Container(
+                    constraints: const BoxConstraints(minWidth: 84),
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: colors.surfaceMuted,
+                      borderRadius: BorderRadius.circular(AppRadius.md),
                     ),
-                    Tooltip(
-                      message: d.conditionDescription,
-                      child: Icon(_icon(d.weatherCode), color: AppTheme.forest),
-                    ),
-                    Text(
-                      '${d.maxTemp.round()}° / ${d.minTemp.round()}°',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    if (d.rainChance != null)
-                      Text(
-                        '${d.rainChance}% rain',
-                        style: const TextStyle(
-                          fontSize: 10.5,
-                          color: AppTheme.inkMuted,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          DateFormat('EEE d').format(d.date),
+                          style: text.labelMedium,
                         ),
-                      ),
-                  ],
-                ),
-              );
-            },
+                        const SizedBox(height: 4),
+                        Icon(
+                          _icon(d.weatherCode),
+                          color: Theme.of(context).colorScheme.primary,
+                          semanticLabel: d.conditionDescription,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${d.maxTemp.round()}° / ${d.minTemp.round()}°',
+                          style: text.labelLarge,
+                        ),
+                        if (d.rainChance != null)
+                          Text(
+                            '${d.rainChance}% rain',
+                            style: text.bodySmall?.copyWith(
+                              color: colors.textSecondary,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ),
         );
       },
@@ -418,9 +417,9 @@ class _FriendPickerState extends ConsumerState<_FriendPicker> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text(
+            Text(
               'Who is coming along?',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+              style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 4),
             const Text(
@@ -439,11 +438,26 @@ class _FriendPickerState extends ConsumerState<_FriendPicker> {
                   child: Text('Could not load your friends.'),
                 ),
                 data: (list) => list.isEmpty
-                    ? const Padding(
-                        padding: EdgeInsets.all(16),
-                        child: Text(
-                          'No friends yet. Add your travel buddy from the Social tab first.',
-                          style: _mutedStyle,
+                    ? Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'No friends yet. Add your travel buddy first, '
+                              'then share the trip.',
+                              style: _mutedStyle,
+                            ),
+                            const SizedBox(height: 8),
+                            AppButton.secondary(
+                              label: 'Find friends',
+                              icon: Icons.person_add_alt_1_outlined,
+                              onPressed: () {
+                                Navigator.of(context).pop();
+                                context.go('/social');
+                              },
+                            ),
+                          ],
                         ),
                       )
                     : ListView(
@@ -470,9 +484,10 @@ class _FriendPickerState extends ConsumerState<_FriendPicker> {
               ),
             ),
             const SizedBox(height: 8),
-            FilledButton(
+            AppButton(
+              label: 'Save',
+              expand: true,
               onPressed: () => Navigator.of(context).pop(_selected.toList()),
-              child: const Text('Save'),
             ),
           ],
         ),
@@ -508,10 +523,7 @@ class _BudgetCard extends StatelessWidget {
           const SizedBox(height: 8),
           Row(
             children: [
-              const Text(
-                'Travellers',
-                style: TextStyle(fontWeight: FontWeight.w600),
-              ),
+              Text('Travellers', style: Theme.of(context).textTheme.bodyLarge),
               const Spacer(),
               IconButton(
                 icon: const Icon(Icons.remove_circle_outline),
@@ -520,13 +532,7 @@ class _BudgetCard extends StatelessWidget {
                     ? () => onEdit(plan.copyWith(travellers: people - 1))
                     : null,
               ),
-              Text(
-                '$people',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
+              Text('$people', style: Theme.of(context).textTheme.titleMedium),
               IconButton(
                 icon: const Icon(Icons.add_circle_outline),
                 tooltip: 'More travellers',
@@ -546,15 +552,12 @@ class _BudgetCard extends StatelessWidget {
                   Expanded(
                     child: Text(
                       line.label,
-                      style: const TextStyle(fontSize: 13.5),
+                      style: Theme.of(context).textTheme.bodyMedium,
                     ),
                   ),
                   Text(
                     '${formatRupees(line.low)} – ${formatRupees(line.high)}',
-                    style: const TextStyle(
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: Theme.of(context).textTheme.labelLarge,
                   ),
                 ],
               ),
@@ -562,19 +565,16 @@ class _BudgetCard extends StatelessWidget {
           const Divider(height: 20),
           Row(
             children: [
-              const Expanded(
+              Expanded(
                 child: Text(
                   'Total',
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
+                  style: Theme.of(context).textTheme.titleSmall,
                 ),
               ),
               Text(
                 '${formatRupees(estimate.low)} – ${formatRupees(estimate.high)}',
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w800,
-                  color: AppTheme.forest,
-                ),
+                style: Theme.of(context).textTheme.titleSmall
+                    ?.copyWith(color: Theme.of(context).colorScheme.primary),
               ),
             ],
           ),
@@ -649,27 +649,22 @@ class _PackingCard extends StatelessWidget {
                 leading: Icon(section.icon, color: AppTheme.inkMuted, size: 20),
                 title: Text(
                   section.title,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                  ),
+                  style: Theme.of(context).textTheme.titleSmall,
                 ),
                 subtitle: Text(
                   '${section.items.where(plan.packingChecked.contains).length} of ${section.items.length} packed',
-                  style: const TextStyle(
-                    fontSize: 11.5,
-                    color: AppTheme.inkMuted,
-                  ),
+                  style: Theme.of(context).textTheme.bodySmall
+                      ?.copyWith(color: AppColors.of(context).textSecondary),
                 ),
                 children: [
                   for (final item in section.items)
+                    // Full 48 px rows: easy to tick while packing.
                     CheckboxListTile(
-                      dense: true,
                       contentPadding: EdgeInsets.zero,
                       controlAffinity: ListTileControlAffinity.leading,
                       value: plan.packingChecked.contains(item),
                       onChanged: (v) => _toggle(item, v ?? false),
-                      title: Text(item, style: const TextStyle(fontSize: 13.5)),
+                      title: Text(item),
                     ),
                 ],
               ),
@@ -730,7 +725,7 @@ class _BookingCard extends StatelessWidget {
               ),
               subtitle: Text(
                 link.subtitle,
-                style: const TextStyle(fontSize: 12),
+                style: Theme.of(context).textTheme.bodySmall,
               ),
               trailing: const Icon(Icons.open_in_new, size: 18),
               onTap: () => _open(context, link.url),

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:sqflite/sqflite.dart';
@@ -8,11 +10,19 @@ import '../domain/location.dart';
 import 'location_seed.dart';
 
 final locationRepositoryProvider = Provider<LocationRepository>((ref) {
-  return LocationRepository(ref.watch(databaseServiceProvider));
+  final repository = LocationRepository(ref.watch(databaseServiceProvider));
+  ref.onDispose(repository.dispose);
+  return repository;
 });
 
 class LocationRepository {
   LocationRepository(this._databaseService);
+
+  final _changes = StreamController<void>.broadcast();
+
+  /// Fires after places are added or discovered, so screens that keep a copy
+  /// (the Map) can reload.
+  Stream<void> get changes => _changes.stream;
 
   /// Kinds of place version 1 doesn't show: treks and mountains, cafés,
   /// camping and waterfalls.
@@ -54,15 +64,21 @@ class LocationRepository {
       )
     ''');
     final rows = await db.query('locations');
-    // Version 1 is Chandigarh only, and leaves out a few kinds of place.
+    // Only places inside India (ServiceArea) are shown, and a few kinds of
+    // place are left out.
     // Places outside the area or of a hidden kind (earlier fetches, AI
     // suggestions) are kept in the database but not shown, so changing
-    // either rule later brings them back.
-    return rows
-        .map(ExploreLocation.fromMap)
-        .where((l) => ServiceArea.containsCoordinates(l.latitude, l.longitude))
-        .where((l) => !hiddenCategories.contains(l.category))
-        .toList();
+    // either rule later brings them back. An ordinary copy of a mystery place
+    // is left out too, so it can't give the mystery away.
+    return ExploreLocation.withoutMysteryTwins(
+      rows
+          .map(ExploreLocation.fromMap)
+          .where(
+            (l) => ServiceArea.containsCoordinates(l.latitude, l.longitude),
+          )
+          .where((l) => !hiddenCategories.contains(l.category))
+          .toList(),
+    );
   }
 
   Future<void> _seed(Database db) async {
@@ -88,6 +104,20 @@ class LocationRepository {
       );
     }
     await batch.commit(noResult: true);
+    if (locations.isNotEmpty) _changes.add(null);
+  }
+
+  /// The stored places with these ids, whatever their kind or area. Unlike
+  /// [getAll], nothing is filtered out: a place the user saved stays visible.
+  Future<List<ExploreLocation>> getByIds(Set<String> ids) async {
+    if (ids.isEmpty) return const [];
+    final db = await _databaseService.database;
+    final rows = await db.query(
+      'locations',
+      where: 'id IN (${List.filled(ids.length, '?').join(',')})',
+      whereArgs: ids.toList(),
+    );
+    return rows.map(ExploreLocation.fromMap).toList();
   }
 
   Future<List<ExploreLocation>> getByCategory(LocationCategory category) async {
@@ -159,6 +189,8 @@ class LocationRepository {
         ),
     ];
   }
+
+  void dispose() => _changes.close();
 
   Future<void> markDiscovered(String id) async {
     final db = await _databaseService.database;

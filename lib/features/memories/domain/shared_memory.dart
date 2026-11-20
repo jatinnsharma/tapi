@@ -49,9 +49,12 @@ class SharedMemory {
       id: id,
       uid: map['uid'] as String,
       displayName: (map['displayName'] as String?) ?? 'Explorer',
-      type: map['type'] == MemoryType.video.name
-          ? MemoryType.video
-          : MemoryType.photo,
+      type: switch (map['type']) {
+        'video' => MemoryType.video,
+        // The server's name for an audio capsule.
+        'voice' => MemoryType.voiceNote,
+        _ => MemoryType.photo,
+      },
       url: map['url'] as String,
       visibility:
           MemoryVisibility.fromName(map['visibility']) ??

@@ -104,4 +104,23 @@ class WeatherRepository {
       return null;
     }
   }
+
+  /// The US air-quality index now at a point (Open-Meteo, free, no key), or
+  /// null when unknown or on any error.
+  Future<int?> getUsAqi(double latitude, double longitude) async {
+    try {
+      final response = await _dio.get(
+        'https://air-quality-api.open-meteo.com/v1/air-quality',
+        queryParameters: {
+          'latitude': latitude,
+          'longitude': longitude,
+          'current': 'us_aqi',
+        },
+      );
+      final current = response.data['current'] as Map<String, dynamic>?;
+      return (current?['us_aqi'] as num?)?.round();
+    } catch (_) {
+      return null;
+    }
+  }
 }

@@ -36,6 +36,10 @@ jobs:
       - name: Analyze project source
         run: flutter analyze
 
+      # No new raw colours or inline font sizes (UI_REDESIGN.md)
+      - name: Design token ratchet
+        run: ./tool/check_design_tokens.sh
+
       # Run unit tests
       - name: Run tests
         run: flutter test

@@ -168,6 +168,12 @@ describe('The server sets the XP, not the app', () => {
     assert.equal(r.placeXp, 50);
   });
 
+  test('no kind of place pays more than 110 (the app clamps to the same)', () => {
+    for (const [category, xp] of Object.entries(PLACE_XP)) {
+      assert.ok(xp >= 50 && xp <= 110, category);
+    }
+  });
+
   test('every kind of place pays within the table', () => {
     for (const [category, xp] of Object.entries(PLACE_XP)) {
       const r = evaluateTrip(honestTrip({ place: place({ category }) }), history());

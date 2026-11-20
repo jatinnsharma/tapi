@@ -7,6 +7,7 @@ import '../../auth/application/auth_service.dart';
 import '../data/social_repository.dart';
 import '../domain/activity_entry.dart';
 import 'social_screen.dart' show mutedUidsProvider;
+import '../../../core/ui/friendly_error.dart';
 
 final _feedProvider = FutureProvider.autoDispose<List<ActivityEntry>>((
   ref,
@@ -56,7 +57,7 @@ class ActivityFeedScreen extends ConsumerWidget {
           child: EmptyStateCard(
             icon: Icons.cloud_off_rounded,
             title: 'Could not load the feed',
-            message: '$error',
+            message: friendlyError(error),
             actionLabel: 'Try again',
             onAction: () => ref.invalidate(_feedProvider),
           ),

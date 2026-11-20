@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:real_world_exploration/features/planner/presentation/trip_planner_screen.dart';
 import 'package:real_world_exploration/core/database/database_service.dart';
 import 'package:real_world_exploration/features/ai/data/gemini_client.dart';
 import 'package:real_world_exploration/features/explore/data/city_repository.dart';
@@ -69,6 +70,7 @@ class _GeminiOnlyAdapter implements HttpClientAdapter {
 }
 
 void main() {
+  _cityMatchingTests();
   TestWidgetsFlutterBinding.ensureInitialized();
   sqfliteFfiInit();
   databaseFactory = databaseFactoryFfi;
@@ -370,6 +372,43 @@ void main() {
       await repo.deleteTrip(plan.id);
       final deleted = await repo.getTrip(plan.id);
       expect(deleted, isNull);
+    });
+  });
+}
+
+void _cityMatchingTests() {
+  group('cityIdForDestination', () {
+    test('keeps the picked city while the text still names it', () {
+      expect(
+        cityIdForDestination(
+          cityId: 'varanasi',
+          pickedFor: 'Varanasi',
+          text: '  varanasi ',
+        ),
+        'varanasi',
+      );
+    });
+
+    test('drops the city once another destination is typed', () {
+      expect(
+        cityIdForDestination(
+          cityId: 'varanasi',
+          pickedFor: 'Varanasi',
+          text: 'Jaipur',
+        ),
+        isNull,
+      );
+    });
+
+    test('no city picked: none', () {
+      expect(
+        cityIdForDestination(cityId: null, pickedFor: null, text: 'Goa'),
+        isNull,
+      );
+      expect(
+        cityIdForDestination(cityId: 'goa', pickedFor: null, text: 'Goa'),
+        isNull,
+      );
     });
   });
 }

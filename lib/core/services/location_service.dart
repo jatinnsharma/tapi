@@ -28,7 +28,7 @@ class LocationService {
   /// given 10 seconds, then the phone's last known position is used.
   ///
   /// With [acceptRecent], a position the phone knew in the last [recentFor] is
-  /// returned at once (good enough to decide "are you in Chandigarh?").
+  /// returned at once (good enough to pick nearby places or cities).
   Future<LatLng?> getCurrentLocation({
     bool acceptRecent = false,
     Duration recentFor = const Duration(minutes: 10),

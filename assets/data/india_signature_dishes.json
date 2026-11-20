@@ -1,0 +1,140 @@
+{
+  "new-delhi": [
+    {"name": "Chole Bhature", "diet": "veg", "when": "Breakfast or lunch", "note": "Spiced chickpeas with puffed fried bread."},
+    {"name": "Paranthe", "diet": "veg", "when": "Breakfast", "note": "Stuffed flatbreads, a classic of Old Delhi's lanes."},
+    {"name": "Daulat ki Chaat", "diet": "veg", "when": "Winter mornings", "note": "Airy whipped milk froth, sold only in the cold months."},
+    {"name": "Butter Chicken", "diet": "nonveg", "when": "Dinner", "note": "Tandoori chicken in a buttery tomato gravy."}
+  ],
+  "varanasi": [
+    {"name": "Kachori Sabzi", "diet": "veg", "when": "Breakfast", "note": "Fried kachoris with potato curry, often with jalebi."},
+    {"name": "Tamatar Chaat", "diet": "veg", "when": "Evening", "note": "A tangy, spiced tomato chaat found only in Banaras."},
+    {"name": "Banarasi Paan", "diet": "veg", "when": "After a meal", "note": "Betel leaf wrapped with sweet fillings."},
+    {"name": "Malaiyo", "diet": "veg", "when": "Winter mornings", "note": "Saffron milk foam set by the overnight dew."},
+    {"name": "Lassi", "diet": "veg", "when": "Afternoon", "note": "Thick yoghurt drink served in clay cups."}
+  ],
+  "amritsar": [
+    {"name": "Amritsari Kulcha", "diet": "veg", "when": "Breakfast or lunch", "note": "Crisp stuffed bread with chole and butter."},
+    {"name": "Amritsari Fish", "diet": "nonveg", "when": "Evening", "note": "Batter-fried fish with ajwain."},
+    {"name": "Langar at the Golden Temple", "diet": "veg", "when": "Any time", "note": "Free community meal served to everyone."},
+    {"name": "Lassi", "diet": "veg", "when": "Afternoon", "note": "Tall glasses of creamy Punjabi lassi."}
+  ],
+  "jaipur": [
+    {"name": "Dal Baati Churma", "diet": "veg", "when": "Lunch", "note": "Baked wheat balls with lentils and sweet crumble."},
+    {"name": "Pyaaz Kachori", "diet": "veg", "when": "Breakfast", "note": "Flaky kachori stuffed with spiced onion."},
+    {"name": "Ghewar", "diet": "veg", "when": "Monsoon festivals", "note": "Honeycomb-like sweet, best around Teej."},
+    {"name": "Laal Maas", "diet": "nonveg", "when": "Dinner", "note": "Fiery mutton curry with red chillies."}
+  ],
+  "udaipur": [
+    {"name": "Dal Baati Churma", "diet": "veg", "when": "Lunch", "note": "Rajasthan's signature meal."},
+    {"name": "Gatte ki Sabzi", "diet": "veg", "when": "Lunch or dinner", "note": "Gram-flour dumplings in yoghurt curry."},
+    {"name": "Mirchi Vada", "diet": "veg", "when": "Evening", "note": "Stuffed chilli fritters."}
+  ],
+  "jodhpur": [
+    {"name": "Mirchi Bada", "diet": "veg", "when": "Evening", "note": "Large chillies stuffed with potato and fried."},
+    {"name": "Mawa Kachori", "diet": "veg", "when": "Any time", "note": "Sweet kachori filled with milk solids, dipped in syrup."},
+    {"name": "Makhaniya Lassi", "diet": "veg", "when": "Afternoon", "note": "Rich saffron lassi topped with cream."}
+  ],
+  "agra": [
+    {"name": "Petha", "diet": "veg", "when": "Any time", "note": "Translucent ash-gourd sweet, Agra's best-known treat."},
+    {"name": "Bedai with Jalebi", "diet": "veg", "when": "Breakfast", "note": "Fried bread with spicy potato curry."},
+    {"name": "Mughlai dishes", "diet": "both", "when": "Dinner", "note": "Kebabs and rich curries from the Mughal kitchen."}
+  ],
+  "lucknow": [
+    {"name": "Galouti Kebab", "diet": "nonveg", "when": "Dinner", "note": "Melt-in-the-mouth minced kebabs."},
+    {"name": "Lucknowi Biryani", "diet": "nonveg", "when": "Lunch or dinner", "note": "Delicately spiced dum-cooked biryani."},
+    {"name": "Basket Chaat", "diet": "veg", "when": "Evening", "note": "Chaat served in a crisp potato basket."},
+    {"name": "Makhan Malai", "diet": "veg", "when": "Winter mornings", "note": "Lucknow's name for the cloud-light milk froth."}
+  ],
+  "patna": [
+    {"name": "Litti Chokha", "diet": "veg", "when": "Lunch", "note": "Roasted wheat balls with smoky mashed vegetables."},
+    {"name": "Khaja", "diet": "veg", "when": "Any time", "note": "Layered, crisp sweet pastry."}
+  ],
+  "chandigarh": [
+    {"name": "Chole Bhature", "diet": "veg", "when": "Breakfast or lunch", "note": "A Punjabi favourite."},
+    {"name": "Sarson da Saag with Makki di Roti", "diet": "veg", "when": "Winter", "note": "Mustard greens with maize bread."},
+    {"name": "Lassi", "diet": "veg", "when": "Afternoon", "note": "Thick Punjabi yoghurt drink."}
+  ],
+  "srinagar": [
+    {"name": "Wazwan", "diet": "nonveg", "when": "Dinner", "note": "A multi-course Kashmiri feast; try rogan josh and gushtaba."},
+    {"name": "Kahwa", "diet": "veg", "when": "Any time", "note": "Green tea with saffron, cardamom and almonds."},
+    {"name": "Noon Chai", "diet": "veg", "when": "Morning", "note": "Salted pink tea, with local breads."}
+  ],
+  "leh": [
+    {"name": "Thukpa", "diet": "both", "when": "Lunch or dinner", "note": "Noodle soup, often with vegetarian versions."},
+    {"name": "Momos", "diet": "both", "when": "Any time", "note": "Steamed dumplings, veg or meat."},
+    {"name": "Butter Tea", "diet": "veg", "when": "Morning", "note": "Salted tea churned with butter, warming at altitude."}
+  ],
+  "manali": [
+    {"name": "Siddu", "diet": "veg", "when": "Any time", "note": "Steamed bread stuffed with walnut or poppy seed."},
+    {"name": "Trout", "diet": "nonveg", "when": "Dinner", "note": "Fresh river trout from the Beas valley."},
+    {"name": "Thukpa", "diet": "both", "when": "Dinner", "note": "Warming Tibetan noodle soup."}
+  ],
+  "rishikesh": [
+    {"name": "Aloo Puri", "diet": "veg", "when": "Breakfast", "note": "Rishikesh is a vegetarian, alcohol-free town."},
+    {"name": "Garhwali Thali", "diet": "veg", "when": "Lunch", "note": "Local hill dishes like kafuli and chainsoo."},
+    {"name": "Ayurvedic cafes", "diet": "veg", "when": "Any time", "note": "Smoothie bowls and herbal teas popular with travellers."}
+  ],
+  "ahmedabad": [
+    {"name": "Gujarati Thali", "diet": "veg", "when": "Lunch", "note": "Many small sweet-and-savoury dishes."},
+    {"name": "Dhokla and Khandvi", "diet": "veg", "when": "Breakfast or snack", "note": "Steamed gram-flour snacks."},
+    {"name": "Fafda Jalebi", "diet": "veg", "when": "Sunday breakfast", "note": "Crisp fafda with hot jalebi."}
+  ],
+  "indore": [
+    {"name": "Poha Jalebi", "diet": "veg", "when": "Breakfast", "note": "Flattened rice with sev, Indore's morning ritual."},
+    {"name": "Sarafa night market", "diet": "veg", "when": "Late night", "note": "A jewellery market that turns into a food street after dark."},
+    {"name": "Bhutte ka Kees", "diet": "veg", "when": "Evening", "note": "Grated corn cooked with milk and spices."}
+  ],
+  "mumbai": [
+    {"name": "Vada Pav", "diet": "veg", "when": "Any time", "note": "Spiced potato fritter in a soft bun."},
+    {"name": "Pav Bhaji", "diet": "veg", "when": "Evening", "note": "Buttery mashed vegetable curry with bread rolls."},
+    {"name": "Bhel Puri", "diet": "veg", "when": "Evening at the beach", "note": "Puffed rice chaat."},
+    {"name": "Bombay Duck fry", "diet": "nonveg", "when": "Lunch", "note": "Crisp fried bombil fish."}
+  ],
+  "pune": [
+    {"name": "Misal Pav", "diet": "veg", "when": "Breakfast", "note": "Spicy sprouted-bean curry with bread."},
+    {"name": "Mastani", "diet": "veg", "when": "Afternoon", "note": "Thick milkshake topped with ice cream."}
+  ],
+  "bengaluru": [
+    {"name": "Masala Dosa", "diet": "veg", "when": "Breakfast", "note": "Crisp dosa, Bengaluru-style with red chutney inside."},
+    {"name": "Idli Vada", "diet": "veg", "when": "Breakfast", "note": "Served with sambar and chutney."},
+    {"name": "Filter Coffee", "diet": "veg", "when": "Any time", "note": "Strong South Indian coffee in a steel tumbler."}
+  ],
+  "mysuru": [
+    {"name": "Mysore Pak", "diet": "veg", "when": "Any time", "note": "Rich gram-flour and ghee sweet, born in the palace kitchens."},
+    {"name": "Mysore Masala Dosa", "diet": "veg", "when": "Breakfast", "note": "Dosa spread with spicy red chutney."}
+  ],
+  "hyderabad": [
+    {"name": "Hyderabadi Biryani", "diet": "nonveg", "when": "Lunch or dinner", "note": "Dum-cooked biryani, the city's pride."},
+    {"name": "Haleem", "diet": "nonveg", "when": "Ramzan evenings", "note": "Slow-cooked wheat and meat, a Ramzan speciality."},
+    {"name": "Irani Chai with Osmania Biscuit", "diet": "veg", "when": "Any time", "note": "Milky tea with a salty-sweet biscuit."}
+  ],
+  "chennai": [
+    {"name": "Idli and Dosa", "diet": "veg", "when": "Breakfast", "note": "With sambar and several chutneys."},
+    {"name": "Filter Coffee", "diet": "veg", "when": "Morning", "note": "Frothy, strong and sweet."},
+    {"name": "Chettinad Chicken", "diet": "nonveg", "when": "Lunch", "note": "Peppery dish from the Chettinad region."}
+  ],
+  "madurai": [
+    {"name": "Jigarthanda", "diet": "veg", "when": "Afternoon", "note": "Cooling milk drink with almond gum and ice cream."},
+    {"name": "Kari Dosai", "diet": "nonveg", "when": "Dinner", "note": "Dosa topped with minced meat and egg."}
+  ],
+  "kochi": [
+    {"name": "Appam with Stew", "diet": "both", "when": "Breakfast", "note": "Lacy rice pancakes with coconut stew (veg versions too)."},
+    {"name": "Karimeen Pollichathu", "diet": "nonveg", "when": "Lunch", "note": "Pearl-spot fish cooked in banana leaf."},
+    {"name": "Kerala Sadya", "diet": "veg", "when": "Lunch", "note": "Vegetarian feast on a banana leaf."}
+  ],
+  "kolkata": [
+    {"name": "Kathi Roll", "diet": "both", "when": "Any time", "note": "Paratha rolls, born in Kolkata."},
+    {"name": "Puchka", "diet": "veg", "when": "Evening", "note": "Kolkata's tangy take on pani puri."},
+    {"name": "Rosogolla and Mishti Doi", "diet": "veg", "when": "After a meal", "note": "Syrupy cheese balls and sweet set yoghurt."},
+    {"name": "Kosha Mangsho", "diet": "nonveg", "when": "Dinner", "note": "Slow-cooked spicy mutton."}
+  ],
+  "guwahati": [
+    {"name": "Assamese Thali", "diet": "both", "when": "Lunch", "note": "Rice with khar, tenga fish curry and pitika."},
+    {"name": "Pitha", "diet": "veg", "when": "Bihu festival", "note": "Rice cakes, sweet or savoury."},
+    {"name": "Assam Tea", "diet": "veg", "when": "Any time", "note": "Strong, malty tea from the state's gardens."}
+  ],
+  "shillong": [
+    {"name": "Jadoh", "diet": "nonveg", "when": "Lunch", "note": "Khasi rice cooked with pork."},
+    {"name": "Momos", "diet": "both", "when": "Any time", "note": "Steamed dumplings, veg or meat."}
+  ]
+}

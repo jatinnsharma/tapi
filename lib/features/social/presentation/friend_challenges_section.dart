@@ -7,6 +7,8 @@ import '../../auth/application/auth_service.dart';
 import '../application/friend_challenge_service.dart';
 import '../application/friends_service.dart';
 import '../domain/friend_challenge.dart';
+import '../../../core/ui/confirm_destructive.dart';
+import '../../../core/ui/friendly_error.dart';
 
 class FriendChallengesSection extends ConsumerWidget {
   const FriendChallengesSection({super.key});
@@ -32,7 +34,7 @@ class FriendChallengesSection extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              padding: const EdgeInsets.only(top: 16, bottom: 4),
               child: Row(
                 children: [
                   const Icon(
@@ -41,16 +43,14 @@ class FriendChallengesSection extends ConsumerWidget {
                     size: 22,
                   ),
                   const SizedBox(width: 8),
-                  const Text(
-                    'Friend Challenges',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.2,
-                      color: AppTheme.ink,
+                  Expanded(
+                    child: Text(
+                      'Friend challenges',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleMedium,
                     ),
                   ),
-                  const Spacer(),
                   TextButton.icon(
                     onPressed: () => _openNewChallengeDialog(context, ref),
                     icon: const Icon(Icons.add_rounded, size: 18),
@@ -65,10 +65,7 @@ class FriendChallengesSection extends ConsumerWidget {
             ),
             if (activeOrPending.isEmpty)
               Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 4,
-                ),
+                padding: const EdgeInsets.symmetric(vertical: 4),
                 child: SoftCard(
                   padding: const EdgeInsets.all(16),
                   child: Row(
@@ -117,10 +114,7 @@ class FriendChallengesSection extends ConsumerWidget {
               ListView.separated(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 4,
-                ),
+                padding: const EdgeInsets.symmetric(vertical: 4),
                 itemCount: activeOrPending.length,
                 separatorBuilder: (_, _) => const SizedBox(height: 10),
                 itemBuilder: (context, index) {
@@ -221,7 +215,15 @@ class _ChallengeCard extends ConsumerWidget {
               children: [
                 Expanded(
                   child: OutlinedButton(
-                    onPressed: () => service.declineChallenge(challenge.id),
+                    onPressed: () async {
+                      final ok = await confirmDestructive(
+                        context,
+                        title: 'Decline this challenge?',
+                        message: 'Your friend will see that you declined.',
+                        confirmLabel: 'Decline',
+                      );
+                      if (ok) await service.declineChallenge(challenge.id);
+                    },
                     child: const Text('Decline'),
                   ),
                 ),
@@ -352,7 +354,8 @@ class _NewChallengeSheetState extends ConsumerState<_NewChallengeSheet> {
           const SizedBox(height: 8),
           friendsAsync.when(
             loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, _) => Text('Could not load friends: $e'),
+            error: (e, _) =>
+                Text('Could not load friends. ${friendlyError(e)}'),
             data: (friends) {
               if (friends.isEmpty) {
                 return const Text(

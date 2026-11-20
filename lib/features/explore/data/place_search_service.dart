@@ -12,7 +12,12 @@ final placeSearchServiceProvider = Provider<PlaceSearchService>((ref) {
   return PlaceSearchService(
     dio: Dio(BaseOptions(connectTimeout: const Duration(seconds: 10))),
     cityRepository: ref.watch(cityRepositoryProvider),
-    savedPlaces: () => ref.read(locationRepositoryProvider).getAll(),
+    // Mystery places are left out: finding one by its name would give the
+    // secret away. They are found on the map and Home instead.
+    savedPlaces: () async => [
+      for (final p in await ref.read(locationRepositoryProvider).getAll())
+        if (!p.isMystery) p,
+    ],
   );
 });
 

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../../core/theme/app_components.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/components.dart';
 import '../explore/presentation/widgets/city_picker_modal.dart';
@@ -12,7 +13,11 @@ import '../locations/presentation/place_sheet.dart';
 import '../locations/presentation/place_style.dart';
 import '../planner/data/opening_hours_service.dart';
 import '../planner/domain/opening_hours.dart';
+import '../preferences/application/preferences_service.dart';
+import '../preferences/domain/preference_mapping.dart';
 import '../tracking/data/adventure_repository.dart';
+import '../weather/application/weather_service.dart';
+import '../weather/presentation/weather_advisory_banner.dart';
 
 /// Kinds of place to filter "Around you" by.
 enum AroundFilter {
@@ -57,6 +62,7 @@ class AroundYouSection extends ConsumerStatefulWidget {
     required this.places,
     required this.loading,
     required this.fetchFailed,
+    this.updating = false,
     required this.onFindNearby,
     required this.onTurnOnLocation,
     this.selectedCityName,
@@ -69,6 +75,9 @@ class AroundYouSection extends ConsumerStatefulWidget {
   final List<ExploreLocation> places;
   final bool loading;
   final bool fetchFailed;
+
+  /// Still looking for new places online: an empty list isn't final yet.
+  final bool updating;
   final VoidCallback onFindNearby;
   final VoidCallback onTurnOnLocation;
   final String? selectedCityName;
@@ -79,7 +88,13 @@ class AroundYouSection extends ConsumerStatefulWidget {
 
 class _AroundYouSectionState extends ConsumerState<AroundYouSection> {
   AroundFilter _filter = AroundFilter.all;
+
+  /// The user chose to see places the weather advisory hides.
+  bool _showAllWeather = false;
   double _radiusKm = 15;
+
+  /// The user picked a distance here; preferences no longer change it.
+  bool _radiusPicked = false;
   static const _radii = [5.0, 10.0, 15.0, 25.0, 50.0];
   static const _distance = Distance();
   static const _maxCards = 10;
@@ -89,6 +104,14 @@ class _AroundYouSectionState extends ConsumerState<AroundYouSection> {
 
   @override
   Widget build(BuildContext context) {
+    // Default distance from how long the user likes to be out.
+    if (!_radiusPicked) {
+      final prefs = ref.watch(userPreferencesProvider).value;
+      final preferred = prefs == null ? null : aroundRadiusKmFor(prefs);
+      if (preferred != null && _radii.contains(preferred)) {
+        _radiusKm = preferred;
+      }
+    }
     final title = widget.selectedCityName == null
         ? 'Around you'
         : 'Around ${widget.selectedCityName}';
@@ -98,21 +121,19 @@ class _AroundYouSectionState extends ConsumerState<AroundYouSection> {
       child: Row(
         children: [
           Expanded(
-            child: Text(
-              title,
-              style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w800,
-                color: AppTheme.ink,
-                letterSpacing: -0.3,
-              ),
+            child: Semantics(
+              header: true,
+              child: Text(title, style: Theme.of(context).textTheme.titleLarge),
             ),
           ),
           if (widget.current != null)
             PopupMenuButton<double>(
               tooltip: 'How far',
               initialValue: _radiusKm,
-              onSelected: (r) => setState(() => _radiusKm = r),
+              onSelected: (r) => setState(() {
+                _radiusKm = r;
+                _radiusPicked = true;
+              }),
               itemBuilder: (_) => [
                 for (final r in _radii)
                   PopupMenuItem(
@@ -120,22 +141,23 @@ class _AroundYouSectionState extends ConsumerState<AroundYouSection> {
                     child: Text('Within ${r.round()} km'),
                   ),
               ],
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    'Within ${_radiusKm.round()} km',
-                    style: const TextStyle(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w700,
-                      color: AppTheme.primary,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: 48),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Within ${_radiusKm.round()} km',
+                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
                     ),
-                  ),
-                  const Icon(
-                    Icons.arrow_drop_down_rounded,
-                    color: AppTheme.primary,
-                  ),
-                ],
+                    Icon(
+                      Icons.arrow_drop_down_rounded,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ],
+                ),
               ),
             ),
         ],
@@ -145,7 +167,19 @@ class _AroundYouSectionState extends ConsumerState<AroundYouSection> {
     if (!widget.hasLocation && widget.selectedCityName == null) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: [header, const SizedBox(height: 10), _locationOff()],
+        children: [
+          header,
+          const SizedBox(height: 10),
+          _locationOff(),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: AppButton.tertiary(
+              label: 'Pick a city instead',
+              icon: Icons.location_city_rounded,
+              onPressed: () => showCityPickerModal(context, ref),
+            ),
+          ),
+        ],
       );
     }
 
@@ -156,10 +190,22 @@ class _AroundYouSectionState extends ConsumerState<AroundYouSection> {
       );
     }
 
-    final inReach = [
+    final advisory = ref
+        .watch(
+          weatherAdvisoryProvider(
+            weatherKey(widget.current!.latitude, widget.current!.longitude),
+          ),
+        )
+        .value;
+    final nearby = [
       for (final p in widget.places)
         if (_kmTo(p) <= _radiusKm) p,
     ];
+    // Bad weather leaves out places it makes unsafe, unless asked not to.
+    final filterWeather = advisory != null && !_showAllWeather;
+    final inReach = filterWeather
+        ? nearby.where((p) => advisory.suits(p.category)).toList()
+        : nearby;
     // Chips only for kinds there are places of (plus "All").
     final filters = [
       for (final f in AroundFilter.values)
@@ -177,9 +223,23 @@ class _AroundYouSectionState extends ConsumerState<AroundYouSection> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         header,
+        if (advisory != null) ...[
+          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: WeatherAdvisoryBanner(
+              advisory: advisory,
+              hiddenCount: nearby.length - inReach.length,
+              showingAll: _showAllWeather,
+              onToggle: () =>
+                  setState(() => _showAllWeather = !_showAllWeather),
+            ),
+          ),
+        ],
         const SizedBox(height: 8),
         SizedBox(
-          height: 40,
+          // Grows with the text size so large text isn't cut off.
+          height: MediaQuery.textScalerOf(context).scale(40).clamp(48, 72),
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -198,10 +258,7 @@ class _AroundYouSectionState extends ConsumerState<AroundYouSection> {
                 selected: selected,
                 showCheckmark: false,
                 onSelected: (_) => setState(() => _filter = f),
-                selectedColor: AppTheme.primary.withValues(alpha: 0.15),
-                labelStyle: TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                labelStyle: Theme.of(context).textTheme.labelLarge?.copyWith(
                   color: selected ? AppTheme.forest : AppTheme.ink,
                 ),
               );
@@ -209,7 +266,13 @@ class _AroundYouSectionState extends ConsumerState<AroundYouSection> {
           ),
         ),
         const SizedBox(height: 6),
-        if (shown.isEmpty) _empty(inReach.isEmpty) else _row(places: shown),
+        if (shown.isNotEmpty)
+          _row(places: shown)
+        else if (widget.updating)
+          // Still looking: not "nothing here" yet.
+          _row(loading: true)
+        else
+          _empty(inReach.isEmpty),
       ],
     );
   }
@@ -260,7 +323,9 @@ class _AroundYouSectionState extends ConsumerState<AroundYouSection> {
   Widget _empty(bool nothingInReach) {
     final String message;
     if (widget.fetchFailed && widget.places.isEmpty) {
-      message = "Couldn't look up places near you. Check your internet connection and try again.";
+      message =
+          "Couldn't look up places near you. Check your internet connection "
+          'and try again.';
     } else if (nothingInReach) {
       message = 'No places within ${_radiusKm.round()} km yet.';
     } else {
@@ -278,7 +343,10 @@ class _AroundYouSectionState extends ConsumerState<AroundYouSection> {
             ? 'Look within ${_radii.last.round()} km'
             : 'Find places nearby',
         onAction: canWiden && widget.places.isNotEmpty
-            ? () => setState(() => _radiusKm = _radii.last)
+            ? () => setState(() {
+                _radiusKm = _radii.last;
+                _radiusPicked = true; // your choice, not the preference's
+              })
             : widget.onFindNearby,
       ),
     );
@@ -287,73 +355,14 @@ class _AroundYouSectionState extends ConsumerState<AroundYouSection> {
   Widget _locationOff() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: SoftCard(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppTheme.amber.withValues(alpha: 0.18),
-              ),
-              child: const Icon(
-                Icons.location_off_rounded,
-                color: AppTheme.amberText,
-              ),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Location is off',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w800,
-                      color: AppTheme.ink,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  const Text(
-                    'Turn on location, or pick any Indian city to see places there.',
-                    style: TextStyle(
-                      fontSize: 12.5,
-                      color: AppTheme.inkMuted,
-                      height: 1.3,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 6,
-                    children: [
-                      FilledButton.icon(
-                        icon: const Icon(Icons.my_location_rounded, size: 16),
-                        label: const Text('Turn on'),
-                        onPressed: widget.onTurnOnLocation,
-                        style: FilledButton.styleFrom(
-                          backgroundColor: AppTheme.primary,
-                          visualDensity: VisualDensity.compact,
-                        ),
-                      ),
-                      OutlinedButton.icon(
-                        icon: const Icon(Icons.location_city_rounded, size: 16),
-                        label: const Text('Pick a city'),
-                        onPressed: () => showCityPickerModal(context, ref),
-                        style: OutlinedButton.styleFrom(
-                          visualDensity: VisualDensity.compact,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+      child: StatusBanner(
+        kind: StatusKind.warning,
+        title: 'Location is off',
+        message:
+            'Turn on location, or pick any Indian city to see places there.',
+        actionLabel: 'Turn on',
+        onAction: widget.onTurnOnLocation,
+        // The second choice sits under the banner.
       ),
     );
   }
@@ -378,7 +387,7 @@ class HomePlaceCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final visited =
         ref.watch(visitedPlaceIdsProvider).value ?? const <String>{};
-    final hidden = place.isMystery && !visited.contains(place.id);
+    final hidden = place.isHiddenMystery(visited);
 
     String? imageUrl;
     if (!hidden) {
@@ -395,7 +404,7 @@ class HomePlaceCard extends ConsumerWidget {
     final km = distanceKm.toStringAsFixed(distanceKm < 10 ? 1 : 0);
 
     return PlaceCard(
-      title: hidden ? 'Mystery Place' : place.name,
+      title: place.nameFor(visited),
       // Open/closed leads the one-line subtitle: as an extra label it could
       // wrap and push the title out of the card.
       subtitle: hidden
@@ -419,7 +428,7 @@ class HomePlaceCard extends ConsumerWidget {
       imageUrl: imageUrl,
       onTap: () =>
           showPlaceSheet(context, place: place, distanceKm: distanceKm),
-      pills: [_DarkPill('$km km'), if (hidden) const _DarkPill('???')],
+      pills: [_DarkPill('$km km')],
     );
   }
 }
@@ -444,18 +453,15 @@ class _SeeAllCard extends StatelessWidget {
       child: SoftCard(
         onTap: () => context.go('/map'),
         padding: const EdgeInsets.all(12),
-        child: const Column(
+        child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.map_outlined, color: AppTheme.primary, size: 30),
-            SizedBox(height: 8),
+            const Icon(Icons.map_outlined, color: AppTheme.primary, size: 30),
+            const SizedBox(height: 8),
             Text(
               'See all on the map',
               textAlign: TextAlign.center,
-              style: TextStyle(
-                fontWeight: FontWeight.w700,
-                color: AppTheme.ink,
-              ),
+              style: Theme.of(context).textTheme.labelLarge,
             ),
           ],
         ),

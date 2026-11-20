@@ -12,6 +12,7 @@ import '../../social/data/social_repository.dart';
 import '../domain/memory_model.dart';
 import '../domain/shared_memory.dart';
 import 'memory_repository.dart';
+import '../../../core/ui/friendly_error.dart';
 
 final sharedMemoryServiceProvider = Provider<SharedMemoryService>((ref) {
   return SharedMemoryService(
@@ -29,9 +30,19 @@ final sharedMemoryServiceProvider = Provider<SharedMemoryService>((ref) {
   );
 });
 
+/// A capsule must be recorded this recently before it is left.
+const capsuleFreshFor = Duration(minutes: 2);
+
+/// Largest capsule recording (the server allows 5 MB).
+const maxCapsuleBytes = 5 * 1024 * 1024;
+
+/// How far around the user capsules are fetched, in metres.
+const capsuleSearchMeters = 500;
+
 /// A problem with sharing that is fine to show the user as it is.
-class SharingException implements Exception {
+class SharingException implements Exception, UserFacingError {
   SharingException(this.message);
+  @override
   final String message;
   @override
   String toString() => message;
@@ -60,7 +71,7 @@ class SharedMemoryService {
   Future<Options> _options({Map<String, Object?>? headers}) async {
     if (memoriesApiUrl.isEmpty) {
       throw SharingException(
-        'Sharing is not set up yet: the app has no memories server address.',
+        "Sharing isn't available in this version of the app yet.",
       );
     }
     final token = await _auth.currentUser?.getIdToken();
@@ -234,6 +245,121 @@ class SharedMemoryService {
         if (!hidden.contains(memory.uid)) memories.add(memory);
       }
       return memories..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    } on DioException catch (e) {
+      _fail(e);
+    }
+  }
+
+  /// Leaves [memory] (a voice note) as an audio capsule where it was
+  /// recorded, for explorers who pass by. It must have been recorded in the
+  /// last [capsuleFreshFor] at a known spot: capsules are left in person.
+  Future<Memory> leaveCapsule({
+    required Memory memory,
+    required String uid,
+    required String fallbackName,
+    required MemoryVisibility visibility,
+    String? caption,
+    DateTime? now,
+  }) async {
+    if (memory.type != MemoryType.voiceNote) {
+      throw SharingException('Only voice notes can be capsules.');
+    }
+    final lat = memory.latitude, lng = memory.longitude;
+    if (lat == null || lng == null) {
+      throw SharingException(
+        "We couldn't tell where you are. Turn on location and try again.",
+      );
+    }
+    if ((now ?? DateTime.now()).difference(memory.timestamp) >
+        capsuleFreshFor) {
+      throw SharingException('Record the capsule where you leave it.');
+    }
+    final file = File(memory.filePath);
+    if (!await file.exists()) {
+      throw SharingException('The recording is no longer on this phone.');
+    }
+    final length = await file.length();
+    if (length > maxCapsuleBytes) {
+      throw SharingException('That recording is too long for a capsule.');
+    }
+    final sharedId = memory.sharedId ?? memory.id;
+    final profile = await _social.getProfile(uid);
+    try {
+      await _dio.put<Object?>(
+        '/memories/$sharedId',
+        queryParameters: {
+          'type': 'voice',
+          'visibility': visibility.name,
+          'displayName': profile?.displayName ?? fallbackName,
+          'createdAt': memory.timestamp.toUtc().toIso8601String(),
+          'caption': ?caption,
+          'lat': lat,
+          'lng': lng,
+        },
+        data: file.openRead(),
+        options: await _options(
+          headers: {
+            Headers.contentLengthHeader: length,
+            Headers.contentTypeHeader: 'audio/mp4',
+          },
+        ),
+      );
+    } on DioException catch (e) {
+      _fail(e);
+    }
+    final shared = memory.copyWith(
+      caption: caption,
+      sharedId: sharedId,
+      visibility: visibility,
+    );
+    await _memories.updateMemory(shared);
+    return shared;
+  }
+
+  /// Audio capsules within [radiusMeters] of a point, nearest first, minus
+  /// people the user blocked (or who blocked them).
+  Future<List<SharedMemory>> nearbyCapsules({
+    required String uid,
+    required double latitude,
+    required double longitude,
+    int radiusMeters = capsuleSearchMeters,
+  }) async {
+    final hidden = {
+      ...await _social.getBlockedUids(uid),
+      ...await _social.getUidsWhoBlockedMe(uid),
+    };
+    try {
+      final response = await _dio.get<Map<String, dynamic>>(
+        '/memories/nearby',
+        queryParameters: {
+          'lat': latitude,
+          'lng': longitude,
+          'radius': radiusMeters,
+        },
+        options: await _options(),
+      );
+      final base = memoriesApiUrl.replaceAll(RegExp(r'/+$'), '');
+      return [
+        for (final raw in (response.data?['memories'] as List?) ?? const [])
+          if (Map<String, Object?>.from(raw as Map) case final map
+              when !hidden.contains(map['uid']))
+            SharedMemory.fromMap(map['id']! as String, {
+              ...map,
+              'url': '$base${map['url']}',
+            }),
+      ];
+    } on DioException catch (e) {
+      _fail(e);
+    }
+  }
+
+  /// Reports someone's shared memory or capsule; enough reports hide it.
+  Future<void> report(String sharedId) async {
+    try {
+      await _dio.post<Object?>(
+        '/memories/$sharedId/report',
+        options: await _options(),
+      );
     } on DioException catch (e) {
       _fail(e);
     }

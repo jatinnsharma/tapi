@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/components.dart';
+import 'sample_data_banner.dart';
 import '../../../core/theme/glass.dart';
 
 class RewardsScreen extends StatelessWidget {
@@ -10,7 +11,10 @@ class RewardsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Explorer Rewards')),
+      appBar: AppBar(
+        title: const Text('Explorer Rewards'),
+        bottom: const SampleDataBanner(),
+      ),
       body: ListView(
         padding: AppSpacing.page,
         children: [

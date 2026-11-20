@@ -3,6 +3,7 @@ import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 import { createApp } from './lib/app.js';
 import { connectStore } from './lib/mongo_store.js';
+import { createGeminiVision } from './lib/lens.js';
 
 const need = (name) => {
   const v = process.env[name];
@@ -33,7 +34,14 @@ const getFriends = async (uid) => {
 };
 
 const store = await connectStore(mongoUri, process.env.MONGODB_DB ?? 'rwe');
-const app = createApp({ verifyToken, store, mediaSecret, getFriends });
+// Sightseer Lens: only when a Gemini key is configured (else /lens says so).
+const askVision = process.env.GEMINI_API_KEY
+  ? createGeminiVision({
+    apiKey: process.env.GEMINI_API_KEY,
+    model: process.env.GEMINI_MODEL ?? 'gemini-flash-latest',
+  })
+  : undefined;
+const app = createApp({ verifyToken, store, mediaSecret, getFriends, askVision });
 
 const port = Number(process.env.PORT ?? 8080);
 app.listen(port, () => console.log(`Memories API listening on ${port}`));

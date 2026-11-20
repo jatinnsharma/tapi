@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/theme/media_shell.dart';
+
 import 'memory_viewer.dart';
 
 /// What the user decided on the review screen.
@@ -33,6 +35,7 @@ class MediaReviewScreen extends StatefulWidget {
     required this.files,
     required this.isVideo,
     this.retakeLabel = 'Retake',
+    this.playbackSpeed = 1,
   });
 
   final List<String> files;
@@ -40,6 +43,9 @@ class MediaReviewScreen extends StatefulWidget {
 
   /// Text of the button that starts over, e.g. "Record again".
   final String retakeLabel;
+
+  /// Below 1 to preview a slow-motion video slowed.
+  final double playbackSpeed;
 
   @override
   State<MediaReviewScreen> createState() => _MediaReviewScreenState();
@@ -72,7 +78,9 @@ class _MediaReviewScreenState extends State<MediaReviewScreen> {
   }
 
   String get _title {
-    if (widget.isVideo) return 'Review video';
+    if (widget.isVideo) {
+      return widget.playbackSpeed < 1 ? 'Review slow motion' : 'Review video';
+    }
     return _kept.length == 1
         ? 'Review photo'
         : 'Review photos (${_index + 1}/${_kept.length})';
@@ -85,17 +93,15 @@ class _MediaReviewScreenState extends State<MediaReviewScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      appBar: AppBar(
-        backgroundColor: Colors.black,
-        foregroundColor: Colors.white,
-        title: Text(_title),
-        leading: IconButton(
-          icon: const Icon(Icons.close_rounded),
-          tooltip: 'Cancel',
-          onPressed: () => _pop(ReviewChoice.cancel),
-        ),
+    return PopScope(
+      // Back cancels, the same as the close button.
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _pop(ReviewChoice.cancel);
+      },
+      child: MediaShell(
+        title: _title,
+        onClose: () => _pop(ReviewChoice.cancel),
         actions: [
           if (!widget.isVideo && _kept.length > 1)
             IconButton(
@@ -104,57 +110,41 @@ class _MediaReviewScreenState extends State<MediaReviewScreen> {
               onPressed: _removeCurrent,
             ),
         ],
-      ),
-      body: Column(
-        children: [
-          Expanded(
-            child: widget.isVideo
-                ? MemoryMedia.file(path: _kept.first, isVideo: true)
-                : PageView.builder(
-                    controller: _pages,
-                    itemCount: _kept.length,
-                    onPageChanged: (i) => setState(() => _index = i),
-                    itemBuilder: (context, i) => MemoryMedia.file(
-                      key: ValueKey(_kept[i]),
-                      path: _kept[i],
-                      isVideo: false,
-                    ),
-                  ),
-          ),
-          SafeArea(
-            top: false,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () => _pop(ReviewChoice.retake),
-                      icon: const Icon(Icons.refresh_rounded),
-                      label: Text(widget.retakeLabel),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.white,
-                        side: const BorderSide(color: Colors.white54),
-                        minimumSize: const Size.fromHeight(52),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: FilledButton.icon(
-                      onPressed: () => _pop(ReviewChoice.use),
-                      icon: const Icon(Icons.check_rounded),
-                      label: Text(_useLabel),
-                      style: FilledButton.styleFrom(
-                        minimumSize: const Size.fromHeight(52),
-                      ),
-                    ),
-                  ),
-                ],
+        body: widget.isVideo
+            ? MemoryMedia.file(
+                path: _kept.first,
+                isVideo: true,
+                playbackSpeed: widget.playbackSpeed,
+              )
+            : PageView.builder(
+                controller: _pages,
+                itemCount: _kept.length,
+                onPageChanged: (i) => setState(() => _index = i),
+                itemBuilder: (context, i) => MemoryMedia.file(
+                  key: ValueKey(_kept[i]),
+                  path: _kept[i],
+                  isVideo: false,
+                ),
+              ),
+        bottom: Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: () => _pop(ReviewChoice.retake),
+                icon: const Icon(Icons.refresh_rounded),
+                label: Text(widget.retakeLabel),
               ),
             ),
-          ),
-        ],
+            const SizedBox(width: 12),
+            Expanded(
+              child: FilledButton.icon(
+                onPressed: () => _pop(ReviewChoice.use),
+                icon: const Icon(Icons.check_rounded),
+                label: Text(_useLabel),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

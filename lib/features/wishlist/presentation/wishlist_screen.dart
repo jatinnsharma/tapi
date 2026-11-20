@@ -7,22 +7,34 @@ import '../../locations/data/location_repository.dart';
 import '../../locations/domain/location.dart';
 import '../../locations/presentation/place_sheet.dart';
 import '../../locations/presentation/place_style.dart';
+import '../../tracking/data/adventure_repository.dart';
 import '../application/wishlist_service.dart';
 import '../data/wishlist_repository.dart';
 import '../domain/wishlist_entry.dart';
+import '../../../core/ui/confirm_destructive.dart';
+import '../../../core/ui/friendly_error.dart';
 
 /// Saved places. (Saved quests from earlier versions are ignored: quests
 /// aren't part of version 1.)
 final _resolvedWishlistProvider =
     FutureProvider.autoDispose<List<ExploreLocation>>((ref) async {
       final entries = await ref.watch(wishlistEntriesProvider.future);
-      final allLocations = await ref.watch(locationRepositoryProvider).getAll();
-
       final locationIds = entries
           .where((e) => e.type == WishlistType.location)
           .map((e) => e.targetId)
           .toSet();
-      return allLocations.where((l) => locationIds.contains(l.id)).toList();
+      // Looked up by id, so saved food, trek or waterfall places (which the
+      // map and Home leave out) still show here.
+      final saved = await ref
+          .watch(locationRepositoryProvider)
+          .getByIds(locationIds);
+      // Keep the order they were saved in.
+      final byId = {for (final l in saved) l.id: l};
+      return [
+        for (final e in entries)
+          if (e.type == WishlistType.location && byId[e.targetId] != null)
+            byId[e.targetId]!,
+      ];
     });
 
 class WishlistScreen extends ConsumerWidget {
@@ -31,6 +43,8 @@ class WishlistScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final wishlistAsync = ref.watch(_resolvedWishlistProvider);
+    final visitedIds =
+        ref.watch(visitedPlaceIdsProvider).value ?? const <String>{};
 
     return Scaffold(
       appBar: AppBar(title: const Text('Wishlist')),
@@ -42,7 +56,7 @@ class WishlistScreen extends ConsumerWidget {
             EmptyStateCard(
               icon: Icons.cloud_off_rounded,
               title: 'Could not load wishlist',
-              message: '$error',
+              message: friendlyError(error),
               actionLabel: 'Try again',
               onAction: () {
                 ref.invalidate(wishlistEntriesProvider);
@@ -78,16 +92,38 @@ class WishlistScreen extends ConsumerWidget {
                   _WishlistRow(
                     gradient: location.category.gradient,
                     icon: location.category.icon,
-                    title: location.name,
-                    subtitle: '${location.category.label} · Tap to start',
+                    title: location.nameFor(visitedIds),
+                    subtitle: location.isHiddenMystery(visitedIds)
+                        ? 'Mystery · Tap to start'
+                        : '${location.category.label} · Tap to start',
                     onTap: () => showPlaceSheet(context, place: location),
                     onRemove: () async {
-                      await ref
-                          .read(wishlistRepositoryProvider)
-                          .remove(WishlistType.location, location.id);
-                      ref.invalidate(wishlistKeysProvider);
-                      ref.invalidate(wishlistEntriesProvider);
-                      ref.invalidate(_resolvedWishlistProvider);
+                      final repository = ref.read(wishlistRepositoryProvider);
+                      void refresh() {
+                        ref.invalidate(wishlistKeysProvider);
+                        ref.invalidate(wishlistEntriesProvider);
+                        ref.invalidate(_resolvedWishlistProvider);
+                      }
+
+                      await repository.remove(
+                        WishlistType.location,
+                        location.id,
+                      );
+                      refresh();
+                      if (!context.mounted) return;
+                      showUndoSnackBar(
+                        context,
+                        message:
+                            '${location.nameFor(visitedIds)} removed from your '
+                            'wishlist',
+                        onUndo: () async {
+                          await repository.add(
+                            WishlistType.location,
+                            location.id,
+                          );
+                          refresh();
+                        },
+                      );
                     },
                   ),
               ],

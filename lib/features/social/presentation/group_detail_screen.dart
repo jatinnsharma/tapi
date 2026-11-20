@@ -9,6 +9,7 @@ import '../../auth/application/auth_service.dart';
 import '../data/social_repository.dart';
 import '../domain/explorer_profile.dart';
 import '../domain/group_safety_status.dart';
+import '../../../core/ui/friendly_error.dart';
 
 class _GroupDetail {
   const _GroupDetail({required this.members, required this.totalXp});
@@ -91,7 +92,7 @@ class GroupDetailScreen extends ConsumerWidget {
           child: EmptyStateCard(
             icon: Icons.cloud_off_rounded,
             title: 'Could not load group',
-            message: '$error',
+            message: friendlyError(error),
             actionLabel: 'Try again',
             onAction: () => ref.invalidate(_groupDetailProvider(groupId)),
           ),

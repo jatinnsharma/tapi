@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/components.dart';
+import 'sample_data_banner.dart';
 import '../../../core/theme/glass.dart';
 import '../domain/gear.dart';
 
@@ -41,7 +42,10 @@ class GearScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Gear Rental')),
+      appBar: AppBar(
+        title: const Text('Gear Rental'),
+        bottom: const SampleDataBanner(),
+      ),
       body: GridView.builder(
         padding: AppSpacing.page,
         gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(

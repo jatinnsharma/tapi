@@ -13,13 +13,16 @@ service firebase.storage {
         && (request.resource.contentType in ['image/jpeg', 'image/png', 'image/webp', 'video/mp4']);
       allow delete: if request.auth != null && request.auth.uid == uid;
     }
-    // Profile photos.
+    // Profile photos. Deleting has no uploaded file to check, so it gets its
+    // own rule (deleting an account removes the photo).
     match /avatars/{file} {
       allow read: if request.auth != null;
-      allow write: if request.auth != null
+      allow create, update: if request.auth != null
         && file == request.auth.uid + '.jpg'
         && request.resource.size < 5 * 1024 * 1024
         && (request.resource.contentType in ['image/jpeg', 'image/png', 'image/webp']);
+      allow delete: if request.auth != null
+        && file == request.auth.uid + '.jpg';
     }
   }
 }

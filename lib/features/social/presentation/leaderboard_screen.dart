@@ -10,6 +10,7 @@ import '../../auth/application/auth_service.dart';
 import '../../profile/domain/explorer_level.dart';
 import '../application/leaderboard_service.dart';
 import '../domain/leaderboard.dart';
+import '../../../core/ui/friendly_error.dart';
 
 /// Global and friends rankings by total XP.
 class LeaderboardScreen extends ConsumerStatefulWidget {
@@ -138,7 +139,7 @@ class _Ranking extends ConsumerWidget {
           EmptyStateCard(
             icon: Icons.cloud_off_rounded,
             title: 'Could not load the rankings',
-            message: '$error',
+            message: friendlyError(error),
             actionLabel: 'Try again',
             onAction: () => ref.invalidate(leaderboardProvider(filter)),
           ),
@@ -330,8 +331,9 @@ class _PodiumSpot extends StatelessWidget {
             fontSize: 14,
           ),
         ),
-        Text(
-          '${_formatXp(e.totalXp)} XP',
+        _XpLabel(
+          xp: e.totalXp,
+          verified: e.verified,
           style: const TextStyle(
             color: AppTheme.amber,
             fontWeight: FontWeight.w800,
@@ -424,8 +426,9 @@ class _RankRow extends StatelessWidget {
               ],
             ),
           ),
-          Text(
-            '${_formatXp(entry.totalXp)} XP',
+          _XpLabel(
+            xp: entry.totalXp,
+            verified: entry.verified,
             style: const TextStyle(
               fontWeight: FontWeight.w800,
               color: AppTheme.amberText,
@@ -470,4 +473,34 @@ String _formatXp(int xp) {
     buffer.write(digits[i]);
   }
   return buffer.toString();
+}
+
+/// "1,250 XP", with a shield when the server judged it.
+class _XpLabel extends StatelessWidget {
+  const _XpLabel({
+    required this.xp,
+    required this.verified,
+    required this.style,
+  });
+
+  final int xp;
+  final bool verified;
+  final TextStyle style;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Text('${_formatXp(xp)} XP', style: style);
+    if (!verified) return text;
+    return Tooltip(
+      message: 'Verified by the server',
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.verified_user, size: 14, color: style.color),
+          const SizedBox(width: 3),
+          text,
+        ],
+      ),
+    );
+  }
 }

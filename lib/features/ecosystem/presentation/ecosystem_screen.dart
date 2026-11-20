@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/components.dart';
+import 'sample_data_banner.dart';
 import '../../../core/theme/glass.dart';
 
 class EcosystemScreen extends StatelessWidget {
@@ -63,7 +64,10 @@ class EcosystemScreen extends StatelessWidget {
     ];
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Ecosystem & Marketplace')),
+      appBar: AppBar(
+        title: const Text('Ecosystem & Marketplace'),
+        bottom: const SampleDataBanner(),
+      ),
       body: ListView(
         padding: AppSpacing.page,
         children: [

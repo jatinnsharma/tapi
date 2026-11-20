@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/components.dart';
+import 'sample_data_banner.dart';
 import '../../../core/theme/glass.dart';
 
 class TransportOption {
@@ -51,7 +52,10 @@ class TransportScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Transport')),
+      appBar: AppBar(
+        title: const Text('Transport'),
+        bottom: const SampleDataBanner(),
+      ),
       body: ListView.builder(
         padding: AppSpacing.page,
         itemCount: _mockTransport.length,

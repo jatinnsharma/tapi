@@ -30,7 +30,8 @@ void main() {
 
       expect(find.text('Trip requirements checklist'), findsOneWidget);
       expect(find.text('Walked ≥ 200 m on trek (50 m)'), findsOneWidget);
-      expect(find.text('Trek lasted ≥ 3 min (1m 0s)'), findsOneWidget);
+      // The rules come from TripGuard, so the copy can't drift from them.
+      expect(find.text('Trek lasted ≥ 2 min (1m 0s)'), findsOneWidget);
       expect(find.text('How XP works'), findsOneWidget);
 
       // Tap "How XP works" to ensure modal opens
@@ -38,7 +39,9 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('How Tabi XP Works'), findsOneWidget);
-      expect(find.text('Minimum 200 m & 3 minutes'), findsOneWidget);
+      expect(find.text('Minimum 200 m & 2 minutes'), findsOneWidget);
+      expect(find.textContaining('up to 1,500 XP a day'), findsOneWidget);
+      expect(find.textContaining('at least 100 meters away'), findsOneWidget);
       expect(find.text('Got it'), findsOneWidget);
 
       await tester.tap(find.text('Got it'));

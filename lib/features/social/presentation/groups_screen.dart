@@ -9,6 +9,8 @@ import '../../../core/theme/components.dart';
 import '../../auth/application/auth_service.dart';
 import '../data/social_repository.dart';
 import '../domain/group.dart';
+import '../../../core/ui/confirm_destructive.dart';
+import '../../../core/ui/friendly_error.dart';
 
 final _publicGroupsProvider = FutureProvider.autoDispose<List<Group>>((ref) {
   return ref.watch(socialRepositoryProvider).getPublicGroups();
@@ -34,9 +36,7 @@ class GroupsScreen extends ConsumerWidget {
           child: EmptyStateCard(
             icon: Icons.cloud_off_rounded,
             title: 'Groups are unavailable',
-            message:
-                'Firebase isn\'t configured yet, so Groups are unavailable. '
-                'See PENDING_TASKS.md for setup steps.',
+            message: "Groups aren't available in this version of the app yet.",
           ),
         ),
       );
@@ -116,7 +116,7 @@ class GroupsScreen extends ConsumerWidget {
               error: (error, stack) => EmptyStateCard(
                 icon: Icons.cloud_off_rounded,
                 title: 'Could not load groups',
-                message: '$error',
+                message: friendlyError(error),
                 actionLabel: 'Try again',
                 onAction: refresh,
               ),
@@ -315,8 +315,21 @@ class _GroupCard extends ConsumerWidget {
           const SizedBox(width: 8),
           if (isCreator)
             IconButton(
-              icon: const Icon(Icons.delete_outline_rounded, color: Colors.red),
+              tooltip: 'Delete group',
+              icon: const Icon(
+                Icons.delete_outline_rounded,
+                color: dangerColor,
+              ),
               onPressed: () async {
+                final ok = await confirmDestructive(
+                  context,
+                  title: 'Delete ${group.name}?',
+                  message:
+                      'The group and its chat are deleted for everyone in '
+                      'it. This can\'t be undone.',
+                  confirmLabel: 'Delete group',
+                );
+                if (!ok) return;
                 await repository.deleteGroup(group.id);
                 onChanged();
               },

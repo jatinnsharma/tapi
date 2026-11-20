@@ -1,126 +1,35 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../core/ui/share_card.dart';
 import '../domain/adventure_session.dart';
 
 Future<void> showTripShareSheet(
   BuildContext context,
   AdventureSession session,
 ) {
-  return showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    showDragHandle: true,
-    backgroundColor: Colors.transparent,
-    builder: (sheetContext) => _TripShareSheet(session: session),
+  return showShareCardSheet(
+    context,
+    title: 'Share trip',
+    card: TripShareCard(session: session),
+    fileName: 'trip-${session.id}.png',
+    shareText: '${session.title} · explored with Tabi',
+    copyText: tripSummaryText(session),
   );
 }
 
-class _TripShareSheet extends StatelessWidget {
-  const _TripShareSheet({required this.session});
-
-  final AdventureSession session;
-
-  String _generateShareText() {
-    final trekKm = (session.trekMeters / 1000).toStringAsFixed(1);
-    final durationMins = (session.durationSeconds / 60).round();
-    final steps = session.trekSteps > 0 ? session.trekSteps : session.steps;
-
-    final stepLine = steps > 0
-        ? '👟 Steps: ${NumberFormat('#,###').format(steps)}\n'
-        : '';
-
-    return '🧭 Explored "${session.title}" with Tabi!\n'
-        '🚶 Trek: $trekKm km\n'
-        '⏱ Duration: $durationMins mins\n'
-        '$stepLine'
-        '⚡ XP Earned: +${session.xpEarned} XP\n\n'
-        '#TabiApp #RealWorldExploration #Chandigarh';
-  }
-
-  void _copyToClipboard(BuildContext context) {
-    Clipboard.setData(ClipboardData(text: _generateShareText()));
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'Trip summary copied to clipboard! Ready to share on WhatsApp or Instagram.',
-        ),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E222A) : Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-      ),
-      padding: EdgeInsets.fromLTRB(
-        20,
-        8,
-        20,
-        MediaQuery.of(context).padding.bottom + 20,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.share_rounded, color: AppTheme.forest, size: 24),
-              const SizedBox(width: 10),
-              const Expanded(
-                child: Text(
-                  'Share Adventure',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -0.3,
-                  ),
-                ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.close_rounded),
-                onPressed: () => Navigator.of(context).pop(),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          // Share Card Preview
-          TripShareCard(session: session),
-          const SizedBox(height: 20),
-          // Action Buttons
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton.icon(
-              onPressed: () => _copyToClipboard(context),
-              icon: const Icon(Icons.copy_rounded, size: 20),
-              label: const Text(
-                'Copy Share Text',
-                style: TextStyle(fontWeight: FontWeight.w800),
-              ),
-              style: FilledButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: const StadiumBorder(),
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Tip: Take a screenshot of the card above to post directly to your Instagram story!',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 12, color: AppTheme.inkMuted),
-          ),
-        ],
-      ),
-    );
-  }
+/// The trip in a few plain lines, for pasting into a message.
+String tripSummaryText(AdventureSession session) {
+  final km = (session.trekMeters / 1000).toStringAsFixed(1);
+  final minutes = (session.durationSeconds / 60).round();
+  final steps = session.trekSteps > 0 ? session.trekSteps : session.steps;
+  return [
+    'Explored "${session.title}" with Tabi',
+    '$km km on foot · $minutes min',
+    if (steps > 0) '${NumberFormat.decimalPattern().format(steps)} steps',
+    if (session.xpEarned > 0) '+${session.xpEarned} XP',
+  ].join('\n');
 }
 
 class TripShareCard extends StatelessWidget {
@@ -214,7 +123,7 @@ class TripShareCard extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            'Adventure Completed · Chandigarh',
+            'Adventure Completed',
             style: TextStyle(
               color: AppTheme.emerald.withValues(alpha: 0.9),
               fontSize: 13,

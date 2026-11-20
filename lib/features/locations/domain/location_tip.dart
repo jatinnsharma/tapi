@@ -1,3 +1,6 @@
+/// Longest tip (also enforced by the Firestore rules).
+const maxTipLength = 280;
+
 class LocationTip {
   const LocationTip({
     required this.id,
@@ -32,3 +35,15 @@ class LocationTip {
     );
   }
 }
+
+/// The tips to show: not written by someone in [hiddenAuthors] (people the
+/// user blocked) and not one the user reported ([reportedTipIds]).
+List<LocationTip> visibleTips(
+  List<LocationTip> tips, {
+  Set<String> hiddenAuthors = const {},
+  Set<String> reportedTipIds = const {},
+}) => [
+  for (final tip in tips)
+    if (!hiddenAuthors.contains(tip.uid) && !reportedTipIds.contains(tip.id))
+      tip,
+];

@@ -9,6 +9,21 @@ it, delete it, list what friends or everyone shared, and serve the files with
 seeking for video. Files are served through links that are signed and expire
 after 6 hours; the feed hands out fresh ones.
 
+**Audio capsules** are voice notes left at a spot (`type=voice`, up to 5 MB,
+`audio/mp4`, `aac` or `mpeg`, location required, at most 2 per person within
+50 m). `GET /memories/nearby?lat=&lng=&radius=` lists the ones near a point
+(public, plus friends' ones), nearest first, radius up to 2 km (default
+500 m). `POST /memories/:id/report` reports someone else's memory or capsule;
+after 3 different people report it, it is hidden from every list (the record
+stays for review). Capsules are found with a `2dsphere` index on `geo`,
+created at start-up.
+
+**Sightseer Lens**: `POST /lens?lat=&lng=&near=` with a JPEG, PNG or WebP
+photo (up to 4 MB) as the body asks Gemini what it shows and returns
+`{ name, style, era, summary, details[3], confidence }`. The Gemini key stays on
+this server. 30 uses per person per day (counted in memory, so a restart
+resets it).
+
 ## Run it on your laptop (to test with a phone)
 
 Needs Node 20+ and a MongoDB (the local one works).
@@ -56,6 +71,8 @@ spell can take up to a minute. The app waits for it.
 | `FIREBASE_PROJECT_ID` | `clone-2353a` (required) |
 | `MONGODB_DB` | Database name, default `rwe` |
 | `PORT` | Set by Render; default 8080 |
+| `GEMINI_API_KEY` | Optional. Turns on the Sightseer Lens (`POST /lens`); without it the lens answers 503 |
+| `GEMINI_MODEL` | Optional, default `gemini-flash-latest` |
 
 ## Tests
 
@@ -68,11 +85,9 @@ The second form creates and drops its own database (`rwe_test_...`).
 
 ## Known limits
 
-- **Friends-only is as honest as the app.** Friendships live in Firebase, so
-  the app sends the friend list with each request and the server trusts it. A
-  modified app could claim friends it doesn't have and see their friends-only
-  memories. Public and unshared memories are not affected. Fixing this means
-  moving friendships to the server too.
-- Nothing yet lets people report a public memory. Delete requests from the
-  owner and account deletion work.
+- **Friends-only is checked by the server.** `server.js` reads accepted
+  friendships from Firestore (Firebase Admin) for every friends-only request,
+  so the friend list the app sends is only used to narrow the result.
+- Reports hide a memory after 3 different reporters; reviewing them is
+  manual (MongoDB). Delete requests from the owner and account deletion work.
 - Uploads are capped at 50 MB per file and 300 shared memories per person.

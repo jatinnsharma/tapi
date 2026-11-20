@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:real_world_exploration/core/theme/components.dart'
+    show PlaceCardSkeleton;
 import 'package:real_world_exploration/features/home/around_you_section.dart';
 import 'package:real_world_exploration/features/locations/data/place_photos_service.dart';
 import 'package:real_world_exploration/features/locations/domain/location.dart';
@@ -13,6 +15,10 @@ import 'package:real_world_exploration/features/planner/presentation/trip_home_c
 import 'package:real_world_exploration/features/tracking/data/adventure_repository.dart';
 import 'package:real_world_exploration/features/weather/data/weather_repository.dart';
 import 'package:real_world_exploration/features/weather/domain/weather_model.dart';
+import 'package:real_world_exploration/features/weather/application/weather_service.dart';
+import 'package:real_world_exploration/features/weather/domain/weather_advisory.dart';
+import 'package:real_world_exploration/features/preferences/application/preferences_service.dart';
+import 'package:real_world_exploration/features/preferences/domain/user_preferences.dart';
 
 TripStop _stop(String id, String name, {bool done = false}) => TripStop(
   id: id,
@@ -175,8 +181,24 @@ void main() {
       expect(find.text('Your trip today'), findsOneWidget);
       expect(find.text('Kashi Vishwanath Temple'), findsOneWidget);
       expect(find.text('1 of 2 stops done'), findsOneWidget);
-      expect(find.text('Go'), findsOneWidget);
+      expect(find.text("Continue today's plan"), findsOneWidget);
       expect(find.textContaining('6 AM – 9 PM'), findsOneWidget);
+    });
+
+    testWidgets('on a trip day with nothing done yet: Start today\'s plan', (
+      tester,
+    ) async {
+      final today = DateTime.now();
+      await pump(tester, [
+        _trip(
+          't',
+          start: DateTime(today.year, today.month, today.day),
+          day1: [_stop('first', 'Assi Ghat'), _stop('second', 'Sarnath')],
+        ),
+      ]);
+      expect(find.text('0 of 2 stops done'), findsOneWidget);
+      expect(find.text("Start today's plan"), findsOneWidget);
+      expect(find.text('View day'), findsOneWidget);
     });
 
     testWidgets('coming up: countdown and packing', (tester) async {
@@ -209,6 +231,13 @@ void main() {
       WidgetTester tester, {
       bool hasLocation = true,
       Map<String, String> hours = const {},
+      WeatherAdvisory? advisory,
+      UserPreferences prefs = const UserPreferences(),
+      List<ExploreLocation>? only,
+      bool updating = false,
+      bool fetchFailed = false,
+      VoidCallback? onTurnOn,
+      VoidCallback? onFind,
     }) async {
       await tester.pumpWidget(
         ProviderScope(
@@ -216,17 +245,23 @@ void main() {
             placePhotosProvider.overrideWith((ref, key) async => const []),
             dayOpeningHoursProvider.overrideWith((ref, key) async => hours),
             visitedPlaceIdsProvider.overrideWith((ref) async => const {}),
+            weatherAdvisoryProvider.overrideWith((ref, at) async => advisory),
+            userPreferencesProvider.overrideWith(() => _FixedPrefs(prefs)),
           ],
           child: MaterialApp(
             home: Scaffold(
-              body: AroundYouSection(
-                current: here,
-                hasLocation: hasLocation,
-                places: places,
-                loading: false,
-                fetchFailed: false,
-                onFindNearby: () {},
-                onTurnOnLocation: () {},
+              // Scrolls, like the Home list it lives in.
+              body: SingleChildScrollView(
+                child: AroundYouSection(
+                  current: here,
+                  hasLocation: hasLocation,
+                  places: only ?? places,
+                  loading: false,
+                  fetchFailed: fetchFailed,
+                  updating: updating,
+                  onFindNearby: onFind ?? () {},
+                  onTurnOnLocation: onTurnOn ?? () {},
+                ),
               ),
             ),
           ),
@@ -254,6 +289,13 @@ void main() {
       expect(find.text('Photo spots'), findsNothing);
     });
 
+    testWidgets('a "Full day" explorer starts at 25 km', (tester) async {
+      await pump(tester, prefs: const UserPreferences(duration: 'Full day'));
+      expect(find.text('Within 25 km'), findsOneWidget);
+      expect(find.text('Place far'), findsNothing); // ~33 km away.
+      expect(find.text('Place cafe'), findsOneWidget); // ~11 km away.
+    });
+
     testWidgets('a wider distance brings in farther places', (tester) async {
       await pump(tester);
       await tester.tap(find.text('Within 15 km'));
@@ -263,16 +305,120 @@ void main() {
       expect(find.text('Place far'), findsOneWidget);
     });
 
+    testWidgets('a thunderstorm hides exposed places until Show all', (
+      tester,
+    ) async {
+      await pump(
+        tester,
+        advisory: WeatherAdvisory.from(
+          const WeatherData(
+            temperature: 26,
+            windSpeed: 30,
+            weatherCode: 95,
+            isDay: true,
+          ),
+        ),
+      );
+      expect(find.text('Thunderstorm nearby'), findsOneWidget);
+      expect(find.text('Place temple'), findsOneWidget);
+      expect(find.text('Place cafe'), findsOneWidget);
+      expect(find.text('Place lake'), findsNothing);
+      expect(find.textContaining('1 place hidden.'), findsOneWidget);
+
+      await tester.tap(find.text('Show all'));
+      await tester.pump();
+      expect(find.text('Place lake'), findsOneWidget);
+    });
+
     testWidgets('shows whether a place is open now', (tester) async {
       await pump(tester, hours: const {'temple': '24/7'});
       expect(find.textContaining('Open now'), findsOneWidget);
     });
 
     testWidgets('location off: turn it on or pick a city', (tester) async {
-      await pump(tester, hasLocation: false);
+      var turnedOn = 0;
+      await pump(tester, hasLocation: false, onTurnOn: () => turnedOn++);
       expect(find.text('Location is off'), findsOneWidget);
-      expect(find.text('Pick a city'), findsOneWidget);
+      expect(find.text('Pick a city instead'), findsOneWidget);
       expect(find.text('Place temple'), findsNothing);
+      await tester.tap(find.text('Turn on'));
+      expect(turnedOn, 1);
+    });
+
+    testWidgets('still looking online: loading, not "Nothing here yet"', (
+      tester,
+    ) async {
+      await pump(tester, only: const [], updating: true);
+      expect(find.text('Nothing here yet'), findsNothing);
+      expect(find.byType(PlaceCardSkeleton), findsWidgets);
+    });
+
+    testWidgets('nothing found, lookup done: says so, with a way to retry', (
+      tester,
+    ) async {
+      var finds = 0;
+      await pump(tester, only: const [], onFind: () => finds++);
+      expect(find.text('Nothing here yet'), findsOneWidget);
+      await tester.tap(find.text('Find places nearby'));
+      expect(finds, 1);
+    });
+
+    testWidgets('offline with nothing saved: asks to check the connection', (
+      tester,
+    ) async {
+      await pump(tester, only: const [], fetchFailed: true);
+      expect(
+        find.textContaining('Check your internet connection'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('known places stay shown while it looks for more', (
+      tester,
+    ) async {
+      await pump(tester, updating: true);
+      expect(find.text('Place temple'), findsOneWidget);
+      expect(find.byType(PlaceCardSkeleton), findsNothing);
+    });
+
+    testWidgets('widening from the empty card sticks (not reset to your '
+        'preference)', (tester) async {
+      await pump(
+        tester,
+        only: [_place('far', LocationCategory.heritage, 25.60)],
+        prefs: const UserPreferences(duration: 'Short walk'),
+      );
+      expect(find.text('Nothing here yet'), findsOneWidget);
+      await tester.tap(find.textContaining('Look within 50 km'));
+      await tester.pump();
+      await tester.pump();
+      expect(find.text('Within 50 km'), findsOneWidget);
+      expect(find.text('Place far'), findsOneWidget);
+    });
+
+    testWidgets('mystery places have no "???" label', (tester) async {
+      await pump(tester, only: [_place('m', LocationCategory.mystery, 25.0)]);
+      expect(find.text('???'), findsNothing);
+    });
+
+    testWidgets('fits a small phone with large text', (tester) async {
+      tester.view.physicalSize = const Size(320, 640);
+      tester.view.devicePixelRatio = 1;
+      tester.platformDispatcher.textScaleFactorTestValue = 1.3;
+      addTearDown(tester.view.reset);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      await pump(tester);
+      expect(tester.takeException(), isNull);
+      await pump(tester, hasLocation: false);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('meets tap-target and label guidelines', (tester) async {
+      final semantics = tester.ensureSemantics();
+      await pump(tester);
+      await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
+      await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+      semantics.dispose();
     });
 
     test('filters group the app\'s categories', () {
@@ -283,4 +429,13 @@ void main() {
       expect(AroundFilter.all.matches(LocationCategory.city), isTrue);
     });
   });
+}
+
+class _FixedPrefs extends UserPreferencesNotifier {
+  _FixedPrefs(this.prefs);
+
+  final UserPreferences prefs;
+
+  @override
+  Future<UserPreferences> build() async => prefs;
 }

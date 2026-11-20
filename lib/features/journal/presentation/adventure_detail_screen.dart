@@ -14,8 +14,9 @@ import '../../tracking/domain/adventure_session.dart';
 import '../../tracking/presentation/journey_trek_breakdown.dart';
 import '../../tracking/domain/checkpoint.dart';
 import '../../tracking/domain/route_point.dart';
-import '../../map/cached_tile_provider.dart';
 import '../../map/person_marker.dart';
+import '../../map/osm_tiles.dart';
+import '../../../core/ui/friendly_error.dart';
 
 class AdventureJournalData {
   const AdventureJournalData({
@@ -92,7 +93,7 @@ class AdventureDetailScreen extends ConsumerWidget {
             child: EmptyStateCard(
               icon: Icons.cloud_off_rounded,
               title: 'Could not load adventure',
-              message: '$error',
+              message: friendlyError(error),
               actionLabel: 'Try again',
               onAction: () =>
                   ref.invalidate(adventureJournalProvider(adventureId)),
@@ -393,12 +394,7 @@ class _RouteMapState extends State<_RouteMap>
                   ),
                 ),
                 children: [
-                  TileLayer(
-                    urlTemplate:
-                        'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                    userAgentPackageName: 'com.example.real_world_exploration',
-                    tileProvider: CachedTileProvider(),
-                  ),
+                  osmTileLayer(),
                   PolylineLayer(
                     polylines: [
                       Polyline(
@@ -447,6 +443,7 @@ class _RouteMapState extends State<_RouteMap>
                         personMarker(currentPoint),
                     ],
                   ),
+                  const OsmAttribution(),
                 ],
               ),
             ),

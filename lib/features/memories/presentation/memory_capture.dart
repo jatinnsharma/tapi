@@ -14,13 +14,10 @@ import '../domain/memory_model.dart';
 import 'camera_screen.dart';
 import 'media_review.dart';
 import 'voice_recorder_widget.dart';
+import '../../../core/ui/friendly_error.dart';
 
-/// Longest video you can record from the app (picked videos have no limit
-/// here, but sharing is capped at 50 MB).
-const _maxVideoLength = Duration(minutes: 1);
-
-/// Bottom sheet with every way to add a memory: take a photo, pick photos
-/// from the gallery, record a video, pick a video, or record a voice note.
+/// Bottom sheet with every way to add a memory: the camera (photo or
+/// video), photos or a video from the gallery, or a voice note.
 /// Resolves to how many memories were saved (0 if the user backed out).
 Future<int> showAddMemorySheet(
   BuildContext context, {
@@ -50,7 +47,8 @@ class _AddMemorySheetState extends ConsumerState<_AddMemorySheet> {
     if (mounted) Navigator.of(context).pop(saved);
   }
 
-  Future<void> _takePhoto() async {
+  /// The app's camera: a photo, or a video (up to a minute).
+  Future<void> _openCamera() async {
     final memory = await Navigator.of(context).push<Memory>(
       MaterialPageRoute(
         builder: (_) => CameraScreen(adventureId: widget.adventureId),
@@ -74,19 +72,6 @@ class _AddMemorySheetState extends ConsumerState<_AddMemorySheet> {
     type: MemoryType.photo,
     fromCamera: false,
     retakeLabel: 'Choose again',
-  );
-
-  Future<void> _recordVideo() => _addReviewed(
-    choose: () async {
-      final f = await ImagePicker().pickVideo(
-        source: ImageSource.camera,
-        maxDuration: _maxVideoLength,
-      );
-      return [?f];
-    },
-    type: MemoryType.video,
-    fromCamera: true,
-    retakeLabel: 'Record again',
   );
 
   Future<void> _pickVideo() => _addReviewed(
@@ -182,7 +167,11 @@ class _AddMemorySheetState extends ConsumerState<_AddMemorySheet> {
       }
     } catch (e) {
       messenger.showSnackBar(
-        SnackBar(content: Text('Could not add that to your memories: $e')),
+        SnackBar(
+          content: Text(
+            'Could not add that to your memories. ${friendlyError(e)}',
+          ),
+        ),
       );
       if (mounted) setState(() => _busy = false);
     }
@@ -193,21 +182,15 @@ class _AddMemorySheetState extends ConsumerState<_AddMemorySheet> {
     final options = <(IconData, String, String, VoidCallback)>[
       (
         Icons.photo_camera_outlined,
-        'Take a photo',
-        'Use the camera',
-        _takePhoto,
+        'Camera',
+        'Tap for a photo, hold for a video',
+        _openCamera,
       ),
       (
         Icons.photo_library_outlined,
         'Photos from gallery',
         'Pick one or several',
         _pickPhotos,
-      ),
-      (
-        Icons.videocam_outlined,
-        'Record a video',
-        'Up to 1 minute',
-        _recordVideo,
       ),
       (
         Icons.video_library_outlined,

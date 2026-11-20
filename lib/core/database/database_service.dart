@@ -6,9 +6,31 @@ final databaseServiceProvider = Provider<DatabaseService>((ref) {
   return DatabaseService();
 });
 
+/// Trip-album photos waiting to upload, uploading or shared (version 10).
+const albumUploadsTableSql = '''
+  CREATE TABLE album_uploads (
+    id TEXT PRIMARY KEY,
+    trip_id TEXT NOT NULL,
+    memory_id TEXT,
+    file_path TEXT NOT NULL,
+    taken_at TEXT NOT NULL,
+    latitude REAL,
+    longitude REAL,
+    include_location INTEGER NOT NULL DEFAULT 0,
+    status TEXT NOT NULL,
+    attempts INTEGER NOT NULL DEFAULT 0,
+    next_try_at TEXT,
+    last_error TEXT,
+    view_file_id TEXT,
+    thumb_file_id TEXT,
+    shared_out_at TEXT,
+    UNIQUE (trip_id, memory_id)
+  )
+''';
+
 class DatabaseService {
   static const _dbName = 'real_world_exploration.db';
-  static const _dbVersion = 9;
+  static const _dbVersion = 11;
 
   Database? _db;
   Future<Database>? _opening;
@@ -123,6 +145,13 @@ class DatabaseService {
         )
       ''');
     }
+    if (oldVersion < 10) {
+      await db.execute(albumUploadsTableSql);
+    }
+    if (oldVersion < 11) {
+      // Slow-motion videos: how fast to play them back.
+      await db.execute('ALTER TABLE memories ADD COLUMN playback_speed REAL');
+    }
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -236,6 +265,7 @@ class DatabaseService {
         duration_seconds INTEGER,
         shared_id TEXT,
         visibility TEXT,
+        playback_speed REAL,
         FOREIGN KEY (adventure_id) REFERENCES adventures (id) ON DELETE CASCADE
       )
     ''');
@@ -269,6 +299,7 @@ class DatabaseService {
         plan_json TEXT NOT NULL
       )
     ''');
+    await db.execute(albumUploadsTableSql);
   }
 
   Future<void> close() async {

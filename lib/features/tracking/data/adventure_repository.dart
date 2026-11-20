@@ -276,6 +276,33 @@ class AdventureRepository {
     };
   }
 
+  /// Every place reached on a counted (completed) trip, oldest first: where
+  /// and when. Trips in progress, failed or thrown away don't count, so
+  /// nothing built on this (passport stamps) can be farmed.
+  Future<List<PlaceVisit>> getCountedPlaceVisits() async {
+    final db = await _databaseService.database;
+    final rows = await db.rawQuery(
+      'SELECT c.id, c.name, c.latitude, c.longitude, c.reached_at, '
+      'c.adventure_id FROM checkpoints c '
+      'JOIN adventures a ON a.id = c.adventure_id '
+      'WHERE c.reached_at IS NOT NULL AND a.status = ? '
+      'ORDER BY c.reached_at',
+      [AdventureStatus.completed.name],
+    );
+    return [
+      for (final row in rows)
+        if (placeIdFromCheckpointId(row['id'] as String) case final placeId?)
+          PlaceVisit(
+            placeId: placeId,
+            name: row['name'] as String,
+            latitude: (row['latitude'] as num).toDouble(),
+            longitude: (row['longitude'] as num).toDouble(),
+            reachedAt: DateTime.parse(row['reached_at'] as String),
+            adventureId: row['adventure_id'] as String,
+          ),
+    ];
+  }
+
   /// The place id inside a destination checkpoint id
   /// (`dest-<placeId>@<tripId>`), or null for other checkpoints.
   static String? placeIdFromCheckpointId(String checkpointId) {
@@ -314,4 +341,23 @@ class AdventureRepository {
     final db = await _databaseService.database;
     await db.delete('adventures', where: 'id = ?', whereArgs: [id]);
   }
+}
+
+/// A place reached on a counted trip.
+class PlaceVisit {
+  const PlaceVisit({
+    required this.placeId,
+    required this.name,
+    required this.latitude,
+    required this.longitude,
+    required this.reachedAt,
+    required this.adventureId,
+  });
+
+  final String placeId;
+  final String name;
+  final double latitude;
+  final double longitude;
+  final DateTime reachedAt;
+  final String adventureId;
 }

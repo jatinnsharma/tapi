@@ -93,4 +93,67 @@ void main() {
       },
     );
   });
+
+  group('Mystery masking', () {
+    const mystery = ExploreLocation(
+      id: 'wiki-mystery-rock-garden',
+      name: 'Rock Garden of Chandigarh',
+      category: LocationCategory.mystery,
+      description: 'Sculpture garden.',
+      latitude: 30.7525,
+      longitude: 76.8067,
+      mysteryHint: 'Recycled ceramic sculptures.',
+    );
+    // The ordinary seed copy, about 60 m away.
+    const twin = ExploreLocation(
+      id: 'wiki-23911325',
+      name: 'Rock Garden of Chandigarh',
+      category: LocationCategory.heritage,
+      description: 'Sculpture garden.',
+      latitude: 30.7525,
+      longitude: 76.8073,
+    );
+
+    test('name stays secret until a counted trip reaches it', () {
+      expect(mystery.isHiddenMystery(const {}), isTrue);
+      expect(mystery.nameFor(const {}), ExploreLocation.mysteryName);
+      expect(mystery.isHiddenMystery({mystery.id}), isFalse);
+      expect(mystery.nameFor({mystery.id}), 'Rock Garden of Chandigarh');
+    });
+
+    test('ordinary places are never masked', () {
+      expect(twin.isHiddenMystery(const {}), isFalse);
+      expect(twin.nameFor(const {}), twin.name);
+    });
+
+    test('drops an ordinary copy of a mystery nearby', () {
+      final shown = ExploreLocation.withoutMysteryTwins([mystery, twin]);
+      expect(shown.map((p) => p.id), [mystery.id]);
+    });
+
+    test('keeps a same-name place far away, and places with other names', () {
+      const farTwin = ExploreLocation(
+        id: 'far',
+        name: 'rock garden of chandigarh!',
+        category: LocationCategory.heritage,
+        description: '',
+        latitude: 28.61,
+        longitude: 77.20,
+      );
+      const other = ExploreLocation(
+        id: 'other',
+        name: 'Sukhna Lake',
+        category: LocationCategory.lake,
+        description: '',
+        latitude: 30.7525,
+        longitude: 76.8070,
+      );
+      final shown = ExploreLocation.withoutMysteryTwins([
+        mystery,
+        farTwin,
+        other,
+      ]);
+      expect(shown.map((p) => p.id), [mystery.id, 'far', 'other']);
+    });
+  });
 }

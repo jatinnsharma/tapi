@@ -327,7 +327,10 @@ Return ONLY JSON:
 
     final all = await locationRepository.getAll();
     const distance = Distance();
+    // Mystery places are left out of plans: an itinerary would print their
+    // names.
     final places = all
+        .where((p) => !p.isMystery)
         .where(
           (p) => distance(coords, LatLng(p.latitude, p.longitude)) <= 40000,
         )

@@ -75,25 +75,24 @@ class StopHours extends StatefulWidget {
 class _StopHoursState extends State<StopHours> {
   bool _expanded = false;
 
-  static const _muted = TextStyle(fontSize: 12.5, color: AppTheme.inkMuted);
-
   @override
   Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    final colors = AppColors.of(context);
+    final small = text.bodySmall;
     final hours = widget.hours;
     if (hours == null) {
       return Row(
         children: [
-          Icon(
-            Icons.schedule_rounded,
-            size: 16,
-            color: AppTheme.inkMuted.withValues(alpha: 0.7),
-          ),
+          Icon(Icons.schedule_rounded, size: 16, color: colors.textSecondary),
           const SizedBox(width: 6),
-          Text(
-            widget.loading
-                ? 'Checking opening hours…'
-                : 'Opening hours not listed · check locally',
-            style: _muted,
+          Expanded(
+            child: Text(
+              widget.loading
+                  ? 'Checking opening hours…'
+                  : 'Opening hours not listed · check locally',
+              style: small?.copyWith(color: colors.textSecondary),
+            ),
           ),
         ],
       );
@@ -108,66 +107,75 @@ class _StopHoursState extends State<StopHours> {
         : DateFormat('EEEE').format(day);
 
     final (Color color, String? chip) = switch (verdict) {
-      HoursVerdict.closedThatDay => (
-        const Color(0xFFD93025),
-        'Closed that day',
-      ),
+      HoursVerdict.closedThatDay => (colors.danger, 'Closed that day'),
       HoursVerdict.wrongTime => (
-        AppTheme.amberText,
+        colors.warning,
         _timingHint(hours, day, widget.timeSlot),
       ),
-      HoursVerdict.open => (const Color(0xFF188038), 'Open'),
-      HoursVerdict.unknown => (AppTheme.inkMuted, null),
+      HoursVerdict.open => (colors.success, 'Open'),
+      HoursVerdict.unknown => (colors.textSecondary, null),
     };
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         InkWell(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(AppRadius.sm),
           onTap: () => setState(() => _expanded = !_expanded),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 3),
-            child: Row(
-              children: [
-                Icon(Icons.schedule_rounded, size: 16, color: color),
-                const SizedBox(width: 6),
-                Flexible(
-                  child: Text.rich(
-                    TextSpan(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 40),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(top: 1),
+                    child: Icon(Icons.schedule_rounded, size: 16, color: color),
+                  ),
+                  const SizedBox(width: 6),
+                  // Hours first, the verdict chips wrap under them on small
+                  // phones instead of squeezing the hours out.
+                  Expanded(
+                    child: Wrap(
+                      spacing: 6,
+                      runSpacing: 4,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        TextSpan(
-                          text: '$dayLabel: ',
-                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        Text.rich(
+                          TextSpan(
+                            children: [
+                              TextSpan(
+                                text: '$dayLabel: ',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              TextSpan(text: dayText),
+                            ],
+                          ),
+                          style: small,
                         ),
-                        TextSpan(text: dayText),
+                        if (chip != null) _Chip(text: chip, color: color),
+                        if (widget.source == HoursSource.ai)
+                          _Chip(text: 'Approx.', color: colors.textSecondary),
                       ],
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 12.5, color: AppTheme.ink),
                   ),
-                ),
-                if (chip != null) ...[
-                  const SizedBox(width: 6),
-                  _Chip(text: chip, color: color),
+                  Icon(
+                    _expanded
+                        ? Icons.keyboard_arrow_up_rounded
+                        : Icons.keyboard_arrow_down_rounded,
+                    size: 20,
+                    color: colors.textSecondary,
+                    semanticLabel: _expanded ? 'Hide week' : 'Show week',
+                  ),
                 ],
-                if (widget.source == HoursSource.ai) ...[
-                  const SizedBox(width: 6),
-                  const _Chip(text: 'Approx.', color: AppTheme.inkMuted),
-                ],
-                Icon(
-                  _expanded
-                      ? Icons.keyboard_arrow_up_rounded
-                      : Icons.keyboard_arrow_down_rounded,
-                  size: 18,
-                  color: AppTheme.inkMuted,
-                ),
-              ],
+              ),
             ),
           ),
         ),
-        if (_expanded) _week(hours, day),
+        if (_expanded) _week(context, hours, day),
       ],
     );
   }
@@ -184,13 +192,15 @@ class _StopHoursState extends State<StopHours> {
     return 'Closed then';
   }
 
-  Widget _week(OpeningHours hours, DateTime highlight) {
+  Widget _week(BuildContext context, OpeningHours hours, DateTime highlight) {
+    final colors = AppColors.of(context);
+    final small = Theme.of(context).textTheme.bodySmall;
     return Container(
       margin: const EdgeInsets.only(top: 6),
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: const Color(0xFFF7F8F7),
-        borderRadius: BorderRadius.circular(12),
+        color: colors.surfaceMuted,
+        borderRadius: BorderRadius.circular(AppRadius.md),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -202,28 +212,26 @@ class _StopHoursState extends State<StopHours> {
                 child: Row(
                   children: [
                     SizedBox(
-                      width: 44,
+                      width: 48,
                       child: Text(
                         OpeningHours.weekdayNames[d - 1],
-                        style: TextStyle(
-                          fontSize: 12.5,
+                        style: small?.copyWith(
                           fontWeight: d == highlight.weekday
-                              ? FontWeight.w800
-                              : FontWeight.w500,
+                              ? FontWeight.w700
+                              : FontWeight.w400,
                         ),
                       ),
                     ),
                     Expanded(
                       child: Text(
                         hours.describeDay(d) ?? 'Not listed',
-                        style: TextStyle(
-                          fontSize: 12.5,
+                        style: small?.copyWith(
                           fontWeight: d == highlight.weekday
-                              ? FontWeight.w800
-                              : FontWeight.w500,
+                              ? FontWeight.w700
+                              : FontWeight.w400,
                           color: hours.describeDay(d) == 'Closed'
-                              ? const Color(0xFFD93025)
-                              : AppTheme.ink,
+                              ? colors.danger
+                              : null,
                         ),
                       ),
                     ),
@@ -231,13 +239,13 @@ class _StopHoursState extends State<StopHours> {
                 ),
               )
           else
-            Text(hours.raw, style: const TextStyle(fontSize: 12.5)),
+            Text(hours.raw, style: small),
           const SizedBox(height: 6),
           Text(
             widget.source == HoursSource.ai
                 ? 'Typical hours suggested by AI. Check before you go.'
                 : 'From OpenStreetMap. Hours can change on festivals and holidays.',
-            style: const TextStyle(fontSize: 11, color: AppTheme.inkMuted),
+            style: small?.copyWith(color: colors.textSecondary),
           ),
         ],
       ),
@@ -255,15 +263,11 @@ class _Chip extends StatelessWidget {
     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
     decoration: BoxDecoration(
       color: color.withValues(alpha: 0.12),
-      borderRadius: BorderRadius.circular(6),
+      borderRadius: BorderRadius.circular(AppRadius.sm),
     ),
     child: Text(
       text,
-      style: TextStyle(
-        fontSize: 10.5,
-        fontWeight: FontWeight.w800,
-        color: color,
-      ),
+      style: Theme.of(context).textTheme.labelMedium?.copyWith(color: color),
     ),
   );
 }

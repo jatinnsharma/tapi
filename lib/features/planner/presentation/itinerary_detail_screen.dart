@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../../core/theme/app_theme.dart';
-import '../../../core/theme/components.dart';
+import '../../../core/theme/app_components.dart';
+import '../../../core/ui/friendly_error.dart';
+import '../domain/safety_tips.dart';
 import '../../locations/presentation/place_photo_gallery.dart';
 import '../../tracking/data/directions_service.dart';
 import '../data/opening_hours_service.dart';
@@ -14,9 +17,14 @@ import '../data/trip_planner_service.dart';
 import '../domain/opening_hours.dart';
 import '../domain/trip_plan.dart';
 import 'stop_actions.dart';
+import 'stop_number_badge.dart';
 import 'stop_hours.dart';
 import 'trip_essentials_view.dart';
 import 'trip_share.dart';
+import '../../map/osm_tiles.dart';
+import 'rebalance_sheet.dart';
+import '../../tours/presentation/publish_tour.dart';
+import '../../../core/ui/confirm_destructive.dart';
 
 /// Road route through a day's stops, keyed by their positions
 /// ("lat,lng;lat,lng;..."). Null when it can't be fetched (offline); the map
@@ -68,12 +76,13 @@ class ItineraryDetailScreen extends ConsumerStatefulWidget {
 
 class _ItineraryDetailScreenState extends ConsumerState<ItineraryDetailScreen> {
   late TripPlan _plan;
-  late int _selectedDayIndex = widget.initialDayIndex.clamp(
-    0,
-    widget.plan.days.length,
-  );
+  late int _selectedDayIndex = _clampDay(widget.initialDayIndex);
   bool _isRegenerating = false;
   final MapController _mapController = MapController();
+
+  /// Plan (the days) or Essentials (dates, weather, budget, packing).
+  /// `?day=N` one past the last day opens Essentials, as before.
+  late bool _essentials = widget.initialDayIndex >= widget.plan.days.length;
 
   @override
   void initState() {
@@ -81,8 +90,11 @@ class _ItineraryDetailScreenState extends ConsumerState<ItineraryDetailScreen> {
     _plan = widget.plan;
   }
 
-  /// The tab after the last day shows the trip's essentials.
-  bool get _showingEssentials => _selectedDayIndex >= _plan.days.length;
+  int _clampDay(int index) =>
+      index.clamp(0, (widget.plan.days.length - 1).clamp(0, 1 << 20));
+
+  /// A plan with no days only has essentials.
+  bool get _showingEssentials => _essentials || _plan.days.isEmpty;
 
   TripDayPlan get _currentDay => _plan.days[_selectedDayIndex];
 
@@ -93,7 +105,7 @@ class _ItineraryDetailScreenState extends ConsumerState<ItineraryDetailScreen> {
     ref.read(savedTripsListProvider.notifier).updatePlan(stamped);
   }
 
-  void _selectTab(int index) {
+  void _selectDay(int index) {
     setState(() => _selectedDayIndex = index);
     if (_showingEssentials) return;
     final stops = _plan.days[index].stops;
@@ -108,28 +120,53 @@ class _ItineraryDetailScreenState extends ConsumerState<ItineraryDetailScreen> {
     }
   }
 
-  Future<void> _regenerateCurrentDay() async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('Regenerate Day ${_currentDay.dayNumber}?'),
-        content: const Text(
-          'This will generate new stops, activities, and dining ideas for this day while keeping the rest of your trip unchanged.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Regenerate'),
-          ),
-        ],
+  /// Re-plans the rest of the day (running late, tired, a place closed,
+  /// rain), with Undo.
+  Future<void> _adjustDay() async {
+    final before = _plan;
+    final updated = await showRebalanceSheet(
+      context,
+      ref,
+      _plan,
+      _selectedDayIndex,
+    );
+    if (updated == null || !mounted) return;
+    _commit(updated);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('Day adjusted.'),
+        action: SnackBarAction(label: 'Undo', onPressed: () => _commit(before)),
       ),
     );
+  }
 
-    if (confirm != true) return;
+  Future<void> _regenerateCurrentDay() async {
+    final dayNumber = _currentDay.dayNumber;
+    // An empty day has nothing to lose: no need to ask.
+    if (_currentDay.stops.isNotEmpty) {
+      final confirm = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text('Replan Day $dayNumber?'),
+          content: const Text(
+            'You\'ll get new stops and food ideas for this day. Other days '
+            'stay the same, and you can undo.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: const Text('Replan day'),
+            ),
+          ],
+        ),
+      );
+      if (confirm != true) return;
+    }
+    final before = _plan;
 
     setState(() => _isRegenerating = true);
 
@@ -146,16 +183,16 @@ class _ItineraryDetailScreenState extends ConsumerState<ItineraryDetailScreen> {
       _commit(_plan.copyWith(days: updatedDays));
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Day ${newDay.dayNumber} regenerated successfully!'),
-        ),
+      showUndoSnackBar(
+        context,
+        message: 'Day ${newDay.dayNumber} replanned',
+        onUndo: () => _commit(before),
       );
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Could not regenerate day. Please try again.'),
+        SnackBar(
+          content: Text('Couldn\'t replan the day. ${friendlyError(e)}'),
         ),
       );
     } finally {
@@ -179,6 +216,8 @@ class _ItineraryDetailScreenState extends ConsumerState<ItineraryDetailScreen> {
   }
 
   void _deleteStop(int index) {
+    final before = _plan;
+    final removed = _currentDay.stops[index];
     final stops = List<TripStop>.from(_currentDay.stops)..removeAt(index);
     final updatedDay = _currentDay.copyWith(stops: stops);
     final updatedDays = List<TripDayPlan>.from(_plan.days);
@@ -186,12 +225,18 @@ class _ItineraryDetailScreenState extends ConsumerState<ItineraryDetailScreen> {
 
     _commit(_plan.copyWith(days: updatedDays));
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Stop removed from itinerary')),
+    showUndoSnackBar(
+      context,
+      message: '${removed.placeName} removed',
+      onUndo: () => _commit(before),
     );
   }
 
   Future<void> _shareTrip(String how) async {
+    if (how == 'tour') {
+      await publishDayAsTour(context, ref, _plan, _selectedDayIndex);
+      return;
+    }
     if (how == 'image') {
       await showTripImageShare(context, _plan);
       return;
@@ -234,14 +279,19 @@ class _ItineraryDetailScreenState extends ConsumerState<ItineraryDetailScreen> {
     if (now < 0 || _plan.days[dayIndex].stops[now].isCompleted) return;
     _setStopCompleted(dayIndex, now, true);
 
-    final next = _nextStopIndex;
+    final next = _selectedDayIndex == dayIndex ? _nextStopIndex : null;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
+        duration: const Duration(seconds: 8),
         content: Text(
-          next == null || _selectedDayIndex != dayIndex
+          next == null
               ? '${stop.placeName} done. Day ${day.dayNumber} complete!'
               : '${stop.placeName} done. Next: ${_currentDay.stops[next].placeName}',
         ),
+        // Keeps the day moving: one tap starts the trip to the next stop.
+        action: next == null
+            ? null
+            : SnackBarAction(label: 'Go', onPressed: () => _goToStop(next)),
       ),
     );
   }
@@ -257,8 +307,8 @@ class _ItineraryDetailScreenState extends ConsumerState<ItineraryDetailScreen> {
         }
         setState(() {
           _plan = remote;
-          if (_selectedDayIndex > _plan.days.length) {
-            _selectedDayIndex = _plan.days.length;
+          if (_selectedDayIndex >= _plan.days.length) {
+            _selectedDayIndex = (_plan.days.length - 1).clamp(0, 1 << 20);
           }
         });
         ref.read(savedTripsListProvider.notifier).applyRemote(remote);
@@ -314,98 +364,100 @@ class _ItineraryDetailScreenState extends ConsumerState<ItineraryDetailScreen> {
           s.placeName,
     ];
 
+    final text = Theme.of(context).textTheme;
+    final colors = AppColors.of(context);
+    final doneCount = stops.where((s) => s.isCompleted).length;
+
     return Scaffold(
       appBar: AppBar(
         title: Text(_plan.destination),
         actions: [
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.share_outlined),
-            tooltip: 'Share itinerary',
-            onSelected: _shareTrip,
-            itemBuilder: (_) => const [
-              PopupMenuItem(
-                value: 'text',
-                child: ListTile(
-                  leading: Icon(Icons.notes),
-                  title: Text('Share as text'),
-                  contentPadding: EdgeInsets.zero,
+          AppIconButton(
+            icon: Icons.photo_library_outlined,
+            tooltip: 'Trip album',
+            onPressed: () => context.push('/trips/${_plan.id}/album'),
+          ),
+          AppIconButton(
+            icon: Icons.share_outlined,
+            tooltip: 'Share trip',
+            onPressed: _showShareSheet,
+          ),
+          PopupMenuButton<VoidCallback>(
+            tooltip: 'More',
+            icon: const Icon(Icons.more_vert_rounded),
+            onSelected: (action) => action(),
+            itemBuilder: (_) => [
+              if (!_showingEssentials && _nextStopIndex != null)
+                PopupMenuItem(
+                  value: _adjustDay,
+                  child: const ListTile(
+                    leading: Icon(Icons.update_rounded),
+                    title: Text('Running late? Adjust the day'),
+                    contentPadding: EdgeInsets.zero,
+                  ),
                 ),
-              ),
+              if (!_showingEssentials)
+                PopupMenuItem(
+                  value: _regenerateCurrentDay,
+                  enabled: !_isRegenerating,
+                  child: const ListTile(
+                    leading: Icon(Icons.autorenew_rounded),
+                    title: Text('Replan this day'),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
               PopupMenuItem(
-                value: 'image',
-                child: ListTile(
-                  leading: Icon(Icons.image_outlined),
-                  title: Text('Share as image'),
+                value: () => showSafetyTipsModal(context),
+                child: const ListTile(
+                  leading: Icon(Icons.shield_outlined),
+                  title: Text('Safety & helplines'),
                   contentPadding: EdgeInsets.zero,
                 ),
               ),
             ],
           ),
-          IconButton(
-            icon: Icon(
-              _plan.cloudSynced ? Icons.cloud_done_outlined : Icons.bookmark,
-            ),
-            color: AppTheme.amber,
-            tooltip: _plan.cloudSynced ? 'Backed up' : 'Saved on this phone',
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    _plan.cloudSynced
-                        ? 'Saved in My Trips and backed up to your account'
-                        : 'Saved in My Trips on this phone. Sign in to back it up.',
-                  ),
-                ),
-              );
-            },
-          ),
         ],
       ),
       body: SafeArea(
+        bottom: false,
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Top Day Tabs
-            Container(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              color: Colors.white.withValues(alpha: 0.8),
-              child: SizedBox(
-                height: 42,
-                child: ListView.separated(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  scrollDirection: Axis.horizontal,
-                  itemCount: _plan.days.length + 1,
-                  separatorBuilder: (_, _) => const SizedBox(width: 8),
-                  itemBuilder: (context, idx) {
-                    final isSelected = _selectedDayIndex == idx;
-                    final isEssentials = idx == _plan.days.length;
-                    return ChoiceChip(
-                      avatar: isEssentials
-                          ? Icon(
-                              Icons.luggage_outlined,
-                              size: 18,
-                              color: isSelected ? Colors.white : AppTheme.ink,
-                            )
-                          : null,
-                      label: Text(
-                        isEssentials ? 'Essentials' : 'Day ${idx + 1}',
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _SyncLine(plan: _plan),
+                  const SizedBox(height: 8),
+                  SegmentedButton<bool>(
+                    showSelectedIcon: false,
+                    segments: const [
+                      ButtonSegment(
+                        value: false,
+                        label: Text('Plan'),
+                        icon: Icon(Icons.route_outlined),
                       ),
-                      selected: isSelected,
-                      onSelected: (_) => _selectTab(idx),
-                      selectedColor: AppTheme.forest,
-                      labelStyle: TextStyle(
-                        color: isSelected ? Colors.white : AppTheme.ink,
-                        fontWeight: isSelected
-                            ? FontWeight.w800
-                            : FontWeight.w600,
+                      ButtonSegment(
+                        value: true,
+                        label: Text('Essentials'),
+                        icon: Icon(Icons.luggage_outlined),
                       ),
-                      backgroundColor: Colors.white,
-                    );
-                  },
-                ),
+                    ],
+                    selected: {_showingEssentials},
+                    onSelectionChanged: _plan.days.isEmpty
+                        ? null
+                        : (v) => setState(() => _essentials = v.single),
+                  ),
+                ],
               ),
             ),
-
-            // Scrollable day details
+            if (!_showingEssentials)
+              _DaySelector(
+                plan: _plan,
+                selected: _selectedDayIndex,
+                onSelected: _selectDay,
+              ),
             Expanded(
               child: _showingEssentials
                   ? TripEssentialsView(
@@ -414,609 +466,132 @@ class _ItineraryDetailScreenState extends ConsumerState<ItineraryDetailScreen> {
                       onStored: (stored) => setState(() => _plan = stored),
                     )
                   : ListView(
-                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 80),
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
                       children: [
-                        // Day Title & Theme
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Column(
+                        Text(_currentDay.title, style: text.titleLarge),
+                        if (_currentDay.theme != null) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            _currentDay.theme!,
+                            style: text.bodyMedium?.copyWith(
+                              color: colors.textSecondary,
+                            ),
+                          ),
+                        ],
+                        if (stops.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            '${stops.length} stops'
+                            '${doneCount > 0 ? ' · $doneCount done' : ''}',
+                            style: text.labelMedium?.copyWith(
+                              color: colors.textSecondary,
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 12),
+                        if (stops.isNotEmpty)
+                          _DayMap(
+                            stops: stops,
+                            route: hasRoadPath ? route.path : null,
+                            nextStop: nextStop,
+                            controller: _mapController,
+                            initialCenter: mapCenter,
+                            onExpand: () => _openFullMap(
+                              stops,
+                              hasRoadPath ? route.path : null,
+                              nextStop,
+                            ),
+                          ),
+                        const SizedBox(height: 12),
+                        // A stop that's closed on this day of the week.
+                        if (closedStops.isNotEmpty && plannedDay != null) ...[
+                          StatusBanner(
+                            kind: StatusKind.warning,
+                            title:
+                                '${closedStops.join(', ')} '
+                                '${closedStops.length == 1 ? 'is' : 'are'} '
+                                'closed on '
+                                '${DateFormat('EEEE').format(plannedDay)}s',
+                            message:
+                                'Move ${closedStops.length == 1 ? 'it' : 'them'} '
+                                'to another day, or replan this day.',
+                            actionLabel: 'Replan day',
+                            onAction: _regenerateCurrentDay,
+                          ),
+                          const SizedBox(height: 12),
+                        ],
+                        if (_currentDay.dayTip != null) ...[
+                          StatusBanner(
+                            kind: StatusKind.info,
+                            title: 'Local tip',
+                            message: _currentDay.dayTip,
+                          ),
+                          const SizedBox(height: 12),
+                        ],
+                        if (stops.isEmpty)
+                          GateCard(
+                            icon: Icons.event_note_outlined,
+                            title: 'Nothing planned for this day',
+                            message: 'Let the planner suggest stops for it.',
+                            actionLabel: 'Plan this day',
+                            onAction: _regenerateCurrentDay,
+                          )
+                        else
+                          for (var idx = 0; idx < stops.length; idx++) ...[
+                            if (idx > 0)
+                              _LegRow(
+                                label:
+                                    route != null && idx - 1 < route.legs.length
+                                    ? describeLeg(route.legs[idx - 1])
+                                    : stops[idx].travelTimeFromPrevious,
+                                walk:
+                                    route != null &&
+                                    idx - 1 < route.legs.length &&
+                                    route.legs[idx - 1].meters <=
+                                        walkableLegMeters,
+                              ),
+                            _StopRow(
+                              key: ValueKey('stop-${stops[idx].id}'),
+                              number: idx + 1,
+                              stop: stops[idx],
+                              isNext: idx == nextStop,
+                              verdict: verdictFor(
+                                hoursOf(stops[idx]).hours,
+                                plannedDay,
+                                stops[idx].timeSlot,
+                              ),
+                              onTap: () => _showStop(
+                                idx,
+                                hours: hoursOf(stops[idx]),
+                                loadingHours: hoursAsync?.isLoading ?? false,
+                                plannedDay: plannedDay,
+                              ),
+                            ),
+                          ],
+                        if (_currentDay.foodSuggestions.isNotEmpty) ...[
+                          const SizedBox(height: 20),
+                          Text('Places to eat', style: text.titleMedium),
+                          const SizedBox(height: 8),
+                          for (final food in _currentDay.foodSuggestions)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 6),
+                              child: Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(
-                                    'Day ${_currentDay.dayNumber}: ${_currentDay.title}',
-                                    style: const TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w800,
-                                      color: AppTheme.ink,
-                                    ),
+                                  Icon(
+                                    Icons.restaurant_menu,
+                                    size: 18,
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .primary,
                                   ),
-                                  if (_currentDay.theme != null) ...[
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      _currentDay.theme!,
-                                      style: const TextStyle(
-                                        fontSize: 13,
-                                        color: AppTheme.inkMuted,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                  ],
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(food, style: text.bodyMedium),
+                                  ),
                                 ],
                               ),
                             ),
-                            IconButton.outlined(
-                              icon: _isRegenerating
-                                  ? const SizedBox(
-                                      width: 18,
-                                      height: 18,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                      ),
-                                    )
-                                  : const Icon(Icons.refresh, size: 20),
-                              tooltip: 'Regenerate this day',
-                              onPressed: _isRegenerating
-                                  ? null
-                                  : _regenerateCurrentDay,
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-
-                        // Route Map for this Day
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(20),
-                          child: Container(
-                            height: 190,
-                            decoration: BoxDecoration(
-                              border: Border.all(color: Colors.white, width: 2),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.08),
-                                  blurRadius: 10,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ],
-                            ),
-                            child: FlutterMap(
-                              mapController: _mapController,
-                              options: MapOptions(
-                                initialCenter: mapCenter,
-                                initialZoom: 12.8,
-                                interactionOptions: const InteractionOptions(
-                                  flags:
-                                      InteractiveFlag.all &
-                                      ~InteractiveFlag.rotate,
-                                ),
-                              ),
-                              children: [
-                                TileLayer(
-                                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                                  userAgentPackageName:
-                                      'com.example.real_world_exploration',
-                                ),
-                                if (stops.length > 1)
-                                  PolylineLayer(
-                                    polylines: [
-                                      // The road route when we have it;
-                                      // otherwise dotted straight lines,
-                                      // which only show the order.
-                                      Polyline(
-                                        points: hasRoadPath
-                                            ? route.path
-                                            : [
-                                                for (final s in stops)
-                                                  s.coordinates,
-                                              ],
-                                        color: AppTheme.forest,
-                                        strokeWidth: 4.0,
-                                        pattern: hasRoadPath
-                                            ? const StrokePattern.solid()
-                                            : StrokePattern.dotted(),
-                                      ),
-                                    ],
-                                  ),
-                                MarkerLayer(
-                                  markers: [
-                                    for (var i = 0; i < stops.length; i++)
-                                      Marker(
-                                        point: LatLng(
-                                          stops[i].latitude,
-                                          stops[i].longitude,
-                                        ),
-                                        width: 32,
-                                        height: 32,
-                                        child: Container(
-                                          decoration: BoxDecoration(
-                                            color: stops[i].isCompleted
-                                                ? Colors.grey
-                                                : i == nextStop
-                                                ? AppTheme.primary
-                                                : AppTheme.forest,
-                                            shape: BoxShape.circle,
-                                            border: Border.all(
-                                              color: Colors.white,
-                                              width: 2,
-                                            ),
-                                            boxShadow: const [
-                                              BoxShadow(
-                                                color: Colors.black26,
-                                                blurRadius: 4,
-                                              ),
-                                            ],
-                                          ),
-                                          child: Center(
-                                            child: stops[i].isCompleted
-                                                ? const Icon(
-                                                    Icons.check,
-                                                    size: 16,
-                                                    color: Colors.white,
-                                                  )
-                                                : Text(
-                                                    '${i + 1}',
-                                                    style: const TextStyle(
-                                                      color: Colors.white,
-                                                      fontSize: 13,
-                                                      fontWeight:
-                                                          FontWeight.w800,
-                                                    ),
-                                                  ),
-                                          ),
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 14),
-
-                        // A stop that's closed on this day of the week.
-                        if (closedStops.isNotEmpty && plannedDay != null)
-                          Container(
-                            margin: const EdgeInsets.only(bottom: 12),
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFFCE8E6),
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Icon(
-                                  Icons.event_busy_rounded,
-                                  color: Color(0xFFD93025),
-                                  size: 20,
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    '${closedStops.join(', ')} '
-                                    '${closedStops.length == 1 ? 'is' : 'are'} closed on '
-                                    '${DateFormat('EEEE').format(plannedDay)}s. '
-                                    'Swap ${closedStops.length == 1 ? 'it' : 'them'} with another day, or regenerate this day.',
-                                    style: const TextStyle(
-                                      fontSize: 12.5,
-                                      fontWeight: FontWeight.w600,
-                                      color: AppTheme.ink,
-                                      height: 1.35,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-
-                        // Day Local Tip Card
-                        if (_currentDay.dayTip != null)
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: AppTheme.amber.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(
-                                color: AppTheme.amber.withValues(alpha: 0.3),
-                              ),
-                            ),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Icon(
-                                  Icons.lightbulb_outline,
-                                  color: AppTheme.amberText,
-                                  size: 20,
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    _currentDay.dayTip!,
-                                    style: const TextStyle(
-                                      fontSize: 12.5,
-                                      color: AppTheme.ink,
-                                      fontWeight: FontWeight.w600,
-                                      height: 1.35,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        const SizedBox(height: 16),
-
-                        // Stops Header
-                        Row(
-                          children: [
-                            Text(
-                              'Planned Stops (${stops.length})',
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w800,
-                                color: AppTheme.ink,
-                              ),
-                            ),
-                            const Spacer(),
-                            if (stops.any((s) => s.isCompleted))
-                              Text(
-                                '${stops.where((s) => s.isCompleted).length} of ${stops.length} done',
-                                style: const TextStyle(
-                                  fontSize: 12.5,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppTheme.primary,
-                                ),
-                              ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-
-                        // Stops List
-                        if (stops.isEmpty)
-                          const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 24),
-                            child: Center(
-                              child: Text(
-                                'No stops for this day. Tap regenerate to add sights!',
-                                style: TextStyle(color: AppTheme.inkMuted),
-                              ),
-                            ),
-                          )
-                        else
-                          ...List.generate(stops.length, (idx) {
-                            final stop = stops[idx];
-                            final leg =
-                                idx > 0 &&
-                                    route != null &&
-                                    idx - 1 < route.legs.length
-                                ? describeLeg(route.legs[idx - 1])
-                                : idx > 0
-                                ? stop.travelTimeFromPrevious
-                                : null;
-                            final legIcon =
-                                route != null &&
-                                    idx > 0 &&
-                                    idx - 1 < route.legs.length &&
-                                    route.legs[idx - 1].meters <=
-                                        walkableLegMeters
-                                ? Icons.directions_walk
-                                : Icons.local_taxi_outlined;
-                            return Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                if (leg != null)
-                                  Padding(
-                                    padding: const EdgeInsets.fromLTRB(
-                                      12,
-                                      0,
-                                      0,
-                                      10,
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        Icon(
-                                          legIcon,
-                                          size: 16,
-                                          color: AppTheme.inkMuted,
-                                        ),
-                                        const SizedBox(width: 6),
-                                        Expanded(
-                                          child: Text(
-                                            leg,
-                                            style: const TextStyle(
-                                              fontSize: 12,
-                                              color: AppTheme.inkMuted,
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                Padding(
-                                  padding: const EdgeInsets.only(bottom: 12),
-                                  child: Opacity(
-                                    opacity: stop.isCompleted ? 0.7 : 1,
-                                    child: SoftCard(
-                                      padding: const EdgeInsets.all(14),
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          // Photos of the place; tap one
-                                          // for full screen.
-                                          PlacePhotoGallery(
-                                            key: ValueKey('photos-${stop.id}'),
-                                            place: stopAsPlace(
-                                              stop,
-                                              _plan.destination,
-                                            ),
-                                            height: 150,
-                                            radius: 16,
-                                          ),
-                                          const SizedBox(height: 12),
-                                          Row(
-                                            children: [
-                                              Container(
-                                                width: 26,
-                                                height: 26,
-                                                decoration: BoxDecoration(
-                                                  color: stop.isCompleted
-                                                      ? AppTheme.primary
-                                                      : AppTheme.forest,
-                                                  shape: BoxShape.circle,
-                                                ),
-                                                child: Center(
-                                                  child: stop.isCompleted
-                                                      ? const Icon(
-                                                          Icons.check,
-                                                          size: 15,
-                                                          color: Colors.white,
-                                                        )
-                                                      : Text(
-                                                          '${idx + 1}',
-                                                          style:
-                                                              const TextStyle(
-                                                                color: Colors
-                                                                    .white,
-                                                                fontWeight:
-                                                                    FontWeight
-                                                                        .w800,
-                                                                fontSize: 12,
-                                                              ),
-                                                        ),
-                                                ),
-                                              ),
-                                              const SizedBox(width: 8),
-                                              Container(
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                      horizontal: 8,
-                                                      vertical: 3,
-                                                    ),
-                                                decoration: BoxDecoration(
-                                                  color: AppTheme.primary
-                                                      .withValues(alpha: 0.12),
-                                                  borderRadius:
-                                                      BorderRadius.circular(8),
-                                                ),
-                                                child: Text(
-                                                  stop.timeSlot.toUpperCase(),
-                                                  style: const TextStyle(
-                                                    fontSize: 10.5,
-                                                    fontWeight: FontWeight.w800,
-                                                    color: AppTheme.primary,
-                                                  ),
-                                                ),
-                                              ),
-                                              const SizedBox(width: 8),
-                                              Text(
-                                                '${stop.durationMinutes} min',
-                                                style: const TextStyle(
-                                                  fontSize: 12,
-                                                  color: AppTheme.inkMuted,
-                                                  fontWeight: FontWeight.w600,
-                                                ),
-                                              ),
-                                              const Spacer(),
-                                              // Reorder & Delete actions
-                                              if (idx > 0)
-                                                IconButton(
-                                                  icon: const Icon(
-                                                    Icons.arrow_upward,
-                                                    size: 18,
-                                                  ),
-                                                  padding: EdgeInsets.zero,
-                                                  constraints:
-                                                      const BoxConstraints(),
-                                                  tooltip: 'Move up',
-                                                  onPressed: () =>
-                                                      _moveStop(idx, idx - 1),
-                                                ),
-                                              if (idx < stops.length - 1) ...[
-                                                const SizedBox(width: 4),
-                                                IconButton(
-                                                  icon: const Icon(
-                                                    Icons.arrow_downward,
-                                                    size: 18,
-                                                  ),
-                                                  padding: EdgeInsets.zero,
-                                                  constraints:
-                                                      const BoxConstraints(),
-                                                  tooltip: 'Move down',
-                                                  onPressed: () =>
-                                                      _moveStop(idx, idx + 1),
-                                                ),
-                                              ],
-                                              const SizedBox(width: 4),
-                                              IconButton(
-                                                icon: const Icon(
-                                                  Icons.close,
-                                                  size: 18,
-                                                  color: Colors.grey,
-                                                ),
-                                                padding: EdgeInsets.zero,
-                                                constraints:
-                                                    const BoxConstraints(),
-                                                tooltip: 'Remove stop',
-                                                onPressed: () =>
-                                                    _deleteStop(idx),
-                                              ),
-                                            ],
-                                          ),
-                                          const SizedBox(height: 10),
-                                          Text(
-                                            stop.placeName,
-                                            style: const TextStyle(
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.w800,
-                                              color: AppTheme.ink,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 4),
-                                          StopHours(
-                                            key: ValueKey('hours-${stop.id}'),
-                                            hours: hoursOf(stop).hours,
-                                            source: hoursOf(stop).source,
-                                            loading:
-                                                hoursAsync?.isLoading ?? false,
-                                            plannedDay: plannedDay,
-                                            timeSlot: stop.timeSlot,
-                                          ),
-                                          const SizedBox(height: 6),
-                                          Text(
-                                            stop.description,
-                                            style: const TextStyle(
-                                              fontSize: 13,
-                                              color: AppTheme.ink,
-                                              height: 1.35,
-                                            ),
-                                          ),
-                                          if (stop.tip != null) ...[
-                                            const SizedBox(height: 6),
-                                            Row(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
-                                              children: [
-                                                const Icon(
-                                                  Icons
-                                                      .tips_and_updates_outlined,
-                                                  size: 15,
-                                                  color: AppTheme.amberText,
-                                                ),
-                                                const SizedBox(width: 6),
-                                                Expanded(
-                                                  child: Text(
-                                                    stop.tip!,
-                                                    style: const TextStyle(
-                                                      fontSize: 12,
-                                                      color: AppTheme.amberText,
-                                                      fontWeight:
-                                                          FontWeight.w600,
-                                                    ),
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ],
-                                          const SizedBox(height: 6),
-                                          Row(
-                                            children: [
-                                              TextButton.icon(
-                                                icon: const Icon(
-                                                  Icons.navigation_outlined,
-                                                  size: 18,
-                                                ),
-                                                label: Text(
-                                                  '+${stop.xpReward ?? TripStop.defaultXp} XP · Go',
-                                                ),
-                                                onPressed: () => _goToStop(idx),
-                                              ),
-                                              const Spacer(),
-                                              TextButton.icon(
-                                                icon: Icon(
-                                                  stop.isCompleted
-                                                      ? Icons.undo
-                                                      : Icons
-                                                            .check_circle_outline,
-                                                  size: 18,
-                                                ),
-                                                label: Text(
-                                                  stop.isCompleted
-                                                      ? 'Undo'
-                                                      : 'Mark done',
-                                                ),
-                                                style: TextButton.styleFrom(
-                                                  foregroundColor:
-                                                      AppTheme.inkMuted,
-                                                ),
-                                                onPressed: () =>
-                                                    _setStopCompleted(
-                                                      _selectedDayIndex,
-                                                      idx,
-                                                      !stop.isCompleted,
-                                                    ),
-                                              ),
-                                            ],
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            );
-                          }),
-
-                        // Food suggestions
-                        if (_currentDay.foodSuggestions.isNotEmpty) ...[
-                          const SizedBox(height: 8),
-                          const Text(
-                            'Recommended Food & Cafes',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w800,
-                              color: AppTheme.ink,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Container(
-                            padding: const EdgeInsets.all(14),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: Colors.grey.shade200),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: _currentDay.foodSuggestions.map((food) {
-                                return Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 4,
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      const Icon(
-                                        Icons.restaurant_menu,
-                                        size: 16,
-                                        color: AppTheme.primary,
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Expanded(
-                                        child: Text(
-                                          food,
-                                          style: const TextStyle(
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.w600,
-                                            color: AppTheme.ink,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              }).toList(),
-                            ),
-                          ),
                         ],
                       ],
                     ),
@@ -1024,54 +599,567 @@ class _ItineraryDetailScreenState extends ConsumerState<ItineraryDetailScreen> {
           ],
         ),
       ),
-      // Sticky bottom action
-      bottomSheet: _showingEssentials
+      // The one main action: go to the next stop.
+      bottomNavigationBar: _showingEssentials || stops.isEmpty
           ? null
-          : Container(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+          : DecoratedBox(
               decoration: BoxDecoration(
-                color: Colors.white,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.08),
-                    blurRadius: 10,
-                    offset: const Offset(0, -3),
-                  ),
-                ],
+                color: colors.surface,
+                border: Border(top: BorderSide(color: colors.border)),
               ),
-              child: SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton.icon(
-                  icon: Icon(
-                    nextStop == null && stops.isNotEmpty
-                        ? Icons.celebration_rounded
-                        : Icons.navigation_rounded,
-                    size: 20,
-                  ),
-                  label: Text(
-                    stops.isEmpty
-                        ? 'No stops planned for this day'
-                        : nextStop == null
-                        ? 'Day ${_currentDay.dayNumber} complete!'
-                        : 'Go to stop ${nextStop + 1}: ${stops[nextStop].placeName}',
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.forest,
-                    foregroundColor: Colors.white,
-                    disabledBackgroundColor: AppTheme.sage,
-                    disabledForegroundColor: AppTheme.forest,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
-                  onPressed: nextStop == null
-                      ? null
-                      : () => _goToStop(nextStop),
+              child: SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+                  child: nextStop == null
+                      ? Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.celebration_rounded,
+                              color: colors.success,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Day ${_currentDay.dayNumber} done',
+                              style: text.titleMedium,
+                            ),
+                          ],
+                        )
+                      : Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '+${stops[nextStop].xpReward ?? TripStop.defaultXp} '
+                              'XP when you get there',
+                              style: text.labelMedium?.copyWith(
+                                color: colors.rewardText,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            AppButton(
+                              label:
+                                  'Go to stop ${nextStop + 1}: '
+                                  '${stops[nextStop].placeName}',
+                              icon: Icons.navigation_rounded,
+                              expand: true,
+                              onPressed: () => _goToStop(nextStop),
+                            ),
+                          ],
+                        ),
                 ),
               ),
             ),
+    );
+  }
+
+  void _showShareSheet() {
+    showAppSheet<void>(
+      context,
+      title: 'Share trip',
+      body: Column(
+        children: [
+          for (final (how, icon, label, detail) in [
+            ('text', Icons.notes, 'As text', 'The plan in a message'),
+            (
+              'image',
+              Icons.image_outlined,
+              'As an image',
+              'A picture of the plan',
+            ),
+            if (!_showingEssentials)
+              (
+                'tour',
+                Icons.tour_outlined,
+                'Publish Day ${_currentDay.dayNumber} as a tour',
+                'Others can follow your route',
+              ),
+          ])
+            Builder(
+              builder: (sheetContext) => AppListTile(
+                leading: Icon(icon),
+                title: label,
+                subtitle: detail,
+                onTap: () {
+                  Navigator.of(sheetContext).pop();
+                  _shareTrip(how);
+                },
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  void _openFullMap(List<TripStop> stops, List<LatLng>? path, int? nextStop) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        fullscreenDialog: true,
+        builder: (_) => Scaffold(
+          appBar: AppBar(title: Text('Day ${_currentDay.dayNumber}')),
+          body: _DayMapView(
+            stops: stops,
+            route: path,
+            nextStop: nextStop,
+            interactive: true,
+            initialCenter: stops.first.coordinates,
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// A stop's details and its edits (done, order, remove) in one sheet.
+  void _showStop(
+    int index, {
+    required ({OpeningHours? hours, HoursSource? source}) hours,
+    required bool loadingHours,
+    required DateTime? plannedDay,
+  }) {
+    final dayIndex = _selectedDayIndex;
+    final stop = _currentDay.stops[index];
+    final count = _currentDay.stops.length;
+    showAppSheet<void>(
+      context,
+      title: stop.placeName,
+      body: Builder(
+        builder: (sheetContext) {
+          final text = Theme.of(sheetContext).textTheme;
+          final colors = AppColors.of(sheetContext);
+          void then(VoidCallback action) {
+            Navigator.of(sheetContext).pop();
+            action();
+          }
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              PlacePhotoGallery(
+                key: ValueKey('photos-${stop.id}'),
+                place: stopAsPlace(stop, _plan.destination),
+                height: 180,
+                radius: AppRadius.md,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                '${stop.timeSlot} · ${stop.durationMinutes} min',
+                style: text.labelLarge?.copyWith(color: colors.textSecondary),
+              ),
+              const SizedBox(height: 4),
+              StopHours(
+                key: ValueKey('hours-${stop.id}'),
+                hours: hours.hours,
+                source: hours.source,
+                loading: loadingHours,
+                plannedDay: plannedDay,
+                timeSlot: stop.timeSlot,
+              ),
+              const SizedBox(height: 8),
+              Text(stop.description, style: text.bodyLarge),
+              if (stop.tip != null) ...[
+                const SizedBox(height: 12),
+                StatusBanner(
+                  kind: StatusKind.info,
+                  title: 'Tip',
+                  message: stop.tip,
+                ),
+              ],
+              const SizedBox(height: 16),
+              Wrap(
+                spacing: 4,
+                runSpacing: 4,
+                children: [
+                  AppButton.tertiary(
+                    label: stop.isCompleted ? 'Mark not done' : 'Mark done',
+                    icon: stop.isCompleted
+                        ? Icons.undo_rounded
+                        : Icons.check_circle_outline,
+                    onPressed: () => then(
+                      () =>
+                          _setStopCompleted(dayIndex, index, !stop.isCompleted),
+                    ),
+                  ),
+                  if (index > 0)
+                    AppButton.tertiary(
+                      label: 'Move earlier',
+                      icon: Icons.arrow_upward_rounded,
+                      onPressed: () => then(() => _moveStop(index, index - 1)),
+                    ),
+                  if (index < count - 1)
+                    AppButton.tertiary(
+                      label: 'Move later',
+                      icon: Icons.arrow_downward_rounded,
+                      onPressed: () => then(() => _moveStop(index, index + 1)),
+                    ),
+                  AppButton.tertiary(
+                    label: 'Remove',
+                    icon: Icons.delete_outline_rounded,
+                    onPressed: () => then(() => _deleteStop(index)),
+                  ),
+                ],
+              ),
+            ],
+          );
+        },
+      ),
+      action: Builder(
+        builder: (sheetContext) => AppButton(
+          label: 'Go here · +${stop.xpReward ?? TripStop.defaultXp} XP',
+          icon: Icons.navigation_rounded,
+          expand: true,
+          onPressed: () {
+            Navigator.of(sheetContext).pop();
+            _goToStop(index);
+          },
+        ),
+      ),
+    );
+  }
+}
+
+/// "Saved on this phone" or "Backed up": a quiet status, not a button.
+class _SyncLine extends StatelessWidget {
+  const _SyncLine({required this.plan});
+
+  final TripPlan plan;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = AppColors.of(context);
+    final synced = plan.cloudSynced;
+    return Row(
+      children: [
+        Icon(
+          synced ? Icons.cloud_done_outlined : Icons.smartphone_outlined,
+          size: 16,
+          color: colors.textSecondary,
+        ),
+        const SizedBox(width: 6),
+        Flexible(
+          child: Text(
+            synced ? 'Backed up' : 'Saved on this phone',
+            style: Theme.of(context).textTheme.labelMedium
+                ?.copyWith(color: colors.textSecondary),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Day 1 · Day 2 …, with the date under each when the trip has dates.
+class _DaySelector extends StatelessWidget {
+  const _DaySelector({
+    required this.plan,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  final TripPlan plan;
+  final int selected;
+  final ValueChanged<int> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final start = plan.startDate;
+    final dateFormat = DateFormat('d MMM');
+    return SizedBox(
+      height: 48,
+      child: ListView.separated(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        scrollDirection: Axis.horizontal,
+        itemCount: plan.days.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
+        itemBuilder: (context, i) {
+          final date = start == null
+              ? null
+              : DateUtils.dateOnly(start).add(Duration(days: i));
+          return ChoiceChip(
+            label: Text(
+              date == null
+                  ? 'Day ${i + 1}'
+                  : 'Day ${i + 1} · ${dateFormat.format(date)}',
+            ),
+            selected: i == selected,
+            onSelected: (_) => onSelected(i),
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// The travel time between two stops, in the gap between their rows.
+class _LegRow extends StatelessWidget {
+  const _LegRow({required this.label, required this.walk});
+
+  final String? label;
+  final bool walk;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = AppColors.of(context);
+    final leg = label;
+    return Padding(
+      padding: const EdgeInsets.only(left: 18),
+      child: Row(
+        children: [
+          Container(width: 2, height: 28, color: colors.border),
+          const SizedBox(width: 18),
+          if (leg != null) ...[
+            Icon(
+              walk ? Icons.directions_walk : Icons.local_taxi_outlined,
+              size: 16,
+              color: colors.textSecondary,
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                leg,
+                style: Theme.of(context).textTheme.bodySmall
+                    ?.copyWith(color: colors.textSecondary),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// One stop in the day's timeline: number, name, when and for how long,
+/// and whether it's open then. Tap for details and edits.
+class _StopRow extends StatelessWidget {
+  const _StopRow({
+    super.key,
+    required this.number,
+    required this.stop,
+    required this.isNext,
+    required this.verdict,
+    required this.onTap,
+  });
+
+  final int number;
+  final TripStop stop;
+  final bool isNext;
+  final HoursVerdict verdict;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    final colors = AppColors.of(context);
+    final scheme = Theme.of(context).colorScheme;
+    final hoursNote = switch (verdict) {
+      HoursVerdict.closedThatDay => 'Closed that day',
+      HoursVerdict.wrongTime => 'May be closed then',
+      _ => null,
+    };
+    return Semantics(
+      button: true,
+      label:
+          'Stop $number, ${stop.placeName}, ${stop.timeSlot}'
+          '${stop.isCompleted ? ', done' : ''}'
+          '${isNext ? ', next' : ''}'
+          '${hoursNote == null ? '' : ', $hoursNote'}',
+      excludeSemantics: true,
+      child: Material(
+        color: isNext ? scheme.primaryContainer : colors.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          side: BorderSide(color: isNext ? scheme.primary : colors.border),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 64),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+              child: Row(
+                children: [
+                  StopNumberBadge(number: number, done: stop.isCompleted),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          stop.placeName,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: text.titleSmall?.copyWith(
+                            decoration: stop.isCompleted
+                                ? TextDecoration.lineThrough
+                                : null,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '${stop.timeSlot} · ${stop.durationMinutes} min',
+                          style: text.bodySmall?.copyWith(
+                            color: colors.textSecondary,
+                          ),
+                        ),
+                        if (hoursNote != null) ...[
+                          const SizedBox(height: 2),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.event_busy_rounded,
+                                size: 14,
+                                color: colors.warning,
+                              ),
+                              const SizedBox(width: 4),
+                              Flexible(
+                                child: Text(
+                                  hoursNote,
+                                  style: text.labelMedium?.copyWith(
+                                    color: colors.warning,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    color: colors.textSecondary,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The day's map in the list: still (so the page scrolls over it), with a
+/// button to open it full screen.
+class _DayMap extends StatelessWidget {
+  const _DayMap({
+    required this.stops,
+    required this.route,
+    required this.nextStop,
+    required this.controller,
+    required this.initialCenter,
+    required this.onExpand,
+  });
+
+  final List<TripStop> stops;
+  final List<LatLng>? route;
+  final int? nextStop;
+  final MapController controller;
+  final LatLng initialCenter;
+  final VoidCallback onExpand;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(AppRadius.lg),
+      child: SizedBox(
+        height: 200,
+        child: Stack(
+          children: [
+            _DayMapView(
+              stops: stops,
+              route: route,
+              nextStop: nextStop,
+              interactive: false,
+              controller: controller,
+              initialCenter: initialCenter,
+            ),
+            Positioned(
+              top: 8,
+              right: 8,
+              child: Material(
+                color: AppColors.of(context).surface,
+                shape: const CircleBorder(),
+                elevation: 1,
+                child: AppIconButton(
+                  icon: Icons.fullscreen_rounded,
+                  tooltip: 'Full-screen map',
+                  onPressed: onExpand,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DayMapView extends StatelessWidget {
+  const _DayMapView({
+    required this.stops,
+    required this.route,
+    required this.nextStop,
+    required this.interactive,
+    required this.initialCenter,
+    this.controller,
+  });
+
+  final List<TripStop> stops;
+
+  /// The road route; null draws dotted straight lines (order only).
+  final List<LatLng>? route;
+  final int? nextStop;
+  final bool interactive;
+  final LatLng initialCenter;
+  final MapController? controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final path = route;
+    return FlutterMap(
+      mapController: controller,
+      options: MapOptions(
+        initialCenter: initialCenter,
+        initialZoom: 12.8,
+        interactionOptions: InteractionOptions(
+          flags: interactive
+              ? InteractiveFlag.all & ~InteractiveFlag.rotate
+              : InteractiveFlag.none,
+        ),
+      ),
+      children: [
+        osmTileLayer(),
+        if (stops.length > 1)
+          PolylineLayer(
+            polylines: [
+              Polyline(
+                points: path ?? [for (final s in stops) s.coordinates],
+                color: AppTheme.forest,
+                strokeWidth: 4.0,
+                pattern: path != null
+                    ? const StrokePattern.solid()
+                    : StrokePattern.dotted(),
+              ),
+            ],
+          ),
+        MarkerLayer(
+          markers: [
+            for (var i = 0; i < stops.length; i++)
+              Marker(
+                point: stops[i].coordinates,
+                width: 32,
+                height: 32,
+                child: StopNumberBadge(
+                  number: i + 1,
+                  done: stops[i].isCompleted,
+                  highlight: i == nextStop,
+                ),
+              ),
+          ],
+        ),
+        const OsmAttribution(),
+      ],
     );
   }
 }

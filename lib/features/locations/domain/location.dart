@@ -1,4 +1,8 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
+
+import '../../../core/config/xp_rules.dart';
 
 enum LocationCategory {
   city,
@@ -139,12 +143,13 @@ class ExploreLocation {
     this.difficulty,
     this.xpReward = 50,
     this.discoveredAt,
-    // Defaults for places with no region info (e.g. AI suggestions):
-    // version 1 covers Chandigarh only.
+    // Defaults for places with no region info. They match the fallbacks in
+    // [fromMap] and the `locations` table defaults, so a place reads back
+    // with the same region it was built with.
     this.neighborhood = 'Central',
-    this.city = 'Chandigarh',
-    this.district = 'Chandigarh',
-    this.region = 'Chandigarh',
+    this.city = 'Delhi',
+    this.district = 'New Delhi',
+    this.region = 'Delhi',
     this.country = 'India',
     this.imageUrl,
     this.mysteryHint,
@@ -173,6 +178,56 @@ class ExploreLocation {
   bool get isDiscovered => discoveredAt != null;
   bool get isMystery =>
       category == LocationCategory.mystery || mysteryHint != null;
+
+  /// What an unsolved mystery is called on screen.
+  static const mysteryName = 'Mystery Place';
+
+  /// What an unsolved mystery says instead of its description.
+  static const mysteryFallbackHint =
+      'A secret hidden location. Walk here on foot to solve the mystery!';
+
+  /// A mystery stays secret until a counted trip reaches it, i.e. until its
+  /// id is in [visitedIds] (`visitedPlaceIdsProvider`).
+  bool isHiddenMystery(Set<String> visitedIds) =>
+      isMystery && !visitedIds.contains(id);
+
+  /// The name to show: [mysteryName] while the mystery is unsolved.
+  String nameFor(Set<String> visitedIds) =>
+      isHiddenMystery(visitedIds) ? mysteryName : name;
+
+  /// Drops ordinary places that are the same place as a mystery: same name
+  /// (ignoring case and punctuation) within 1 km. Otherwise the ordinary
+  /// copy, from the seed or a Wikipedia fetch, gives the secret away.
+  static List<ExploreLocation> withoutMysteryTwins(
+    List<ExploreLocation> places,
+  ) {
+    final mysteries = places.where((p) => p.isMystery).toList();
+    if (mysteries.isEmpty) return places;
+    bool isTwin(ExploreLocation p) =>
+        !p.isMystery &&
+        mysteries.any(
+          (m) =>
+              _normalizedName(m.name) == _normalizedName(p.name) &&
+              _metersBetween(m, p) <= 1000,
+        );
+    return places.where((p) => !isTwin(p)).toList();
+  }
+
+  static String _normalizedName(String name) =>
+      name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+
+  static double _metersBetween(ExploreLocation a, ExploreLocation b) {
+    const earthRadius = 6371000.0;
+    double rad(double deg) => deg * math.pi / 180;
+    final dLat = rad(b.latitude - a.latitude);
+    final dLng = rad(b.longitude - a.longitude);
+    final h =
+        math.pow(math.sin(dLat / 2), 2) +
+        math.cos(rad(a.latitude)) *
+            math.cos(rad(b.latitude)) *
+            math.pow(math.sin(dLng / 2), 2);
+    return 2 * earthRadius * math.asin(math.sqrt(h));
+  }
 
   ExploreLocation copyWith({DateTime? discoveredAt, String? mysteryHint}) {
     return ExploreLocation(
@@ -228,7 +283,8 @@ class ExploreLocation {
       discoveredAt: map['discovered_at'] == null
           ? null
           : DateTime.parse(map['discovered_at'] as String),
-      xpReward: map['xp_reward'] as int,
+      // Stored rows may predate the XP limits; show what is really paid.
+      xpReward: clampPlaceXp(map['xp_reward'] as int),
       neighborhood: (map['neighborhood'] as String?) ?? 'Central',
       city: (map['city'] as String?) ?? 'Delhi',
       district: (map['district'] as String?) ?? 'New Delhi',

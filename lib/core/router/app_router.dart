@@ -19,6 +19,9 @@ import '../../features/social/presentation/group_detail_screen.dart';
 import '../../features/social/presentation/group_live_map_screen.dart';
 import '../../features/social/presentation/groups_screen.dart';
 import '../../features/wishlist/presentation/wishlist_screen.dart';
+import '../../features/safety/presentation/safety_screen.dart';
+import '../../features/passport/presentation/passport_book_screen.dart';
+import '../../features/heatmap/presentation/heatmap_screen.dart';
 import '../../features/profile/achievements_screen.dart';
 import '../../features/profile/profile_screen.dart';
 import '../../features/auth/presentation/login_screen.dart';
@@ -39,20 +42,25 @@ import '../../features/onboarding/presentation/onboarding_screen.dart';
 import '../../features/explore/presentation/city_detail_screen.dart';
 import '../../features/planner/presentation/trip_planner_screen.dart';
 import '../../features/planner/presentation/my_trips_screen.dart';
+import '../../features/planner/presentation/trip_route_screen.dart';
+import '../../features/settings/presentation/settings_screen.dart';
 import 'main_layout.dart';
+import '../../features/profile/regions_screen.dart';
+import '../../features/social/presentation/privacy_screen.dart';
+import '../../features/album/presentation/trip_album_screen.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
-  final onboardingDone = ref.watch(onboardingCompletedProvider);
+  // Read, not watched: finishing onboarding must not rebuild the router
+  // (that would drop the navigation in progress). The redirect below reads
+  // the current value on every navigation.
+  final onboardingDone = ref.read(onboardingCompletedProvider);
 
   return GoRouter(
-    initialLocation: onboardingDone ? '/explore' : '/onboarding',
-    redirect: (context, state) {
-      final done = ref.read(onboardingCompletedProvider);
-      if (!done && state.matchedLocation != '/onboarding') {
-        return '/onboarding';
-      }
-      return null;
-    },
+    initialLocation: startLocation(onboarded: onboardingDone),
+    redirect: (context, state) => onboardingRedirect(
+      onboarded: ref.read(onboardingCompletedProvider),
+      location: state.matchedLocation,
+    ),
     routes: [
       GoRoute(
         path: '/onboarding',
@@ -76,9 +84,31 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           );
         },
       ),
+      // Old address of the Trips list: now a tab.
+      GoRoute(path: '/my-trips', redirect: (context, state) => '/trips'),
       GoRoute(
-        path: '/my-trips',
-        builder: (context, state) => const MyTripsScreen(),
+        path: '/trips/:tripId',
+        builder: (context, state) => TripRouteScreen(
+          tripId: state.pathParameters['tripId']!,
+          day: int.tryParse(state.uri.queryParameters['day'] ?? '') ?? 0,
+        ),
+        routes: [
+          GoRoute(
+            path: 'album',
+            builder: (context, state) =>
+                TripAlbumScreen(tripId: state.pathParameters['tripId']!),
+          ),
+        ],
+      ),
+      GoRoute(
+        path: '/settings',
+        builder: (context, state) => const SettingsScreen(),
+        routes: [
+          GoRoute(
+            path: 'privacy',
+            builder: (context, state) => const PrivacyScreen(),
+          ),
+        ],
       ),
       GoRoute(
         path: '/tracking',
@@ -122,6 +152,18 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/wishlist',
         builder: (context, state) => const WishlistScreen(),
+      ),
+      GoRoute(
+        path: '/safety',
+        builder: (context, state) => const SafetyScreen(),
+      ),
+      GoRoute(
+        path: '/passport-stamps',
+        builder: (context, state) => const PassportBookScreen(),
+      ),
+      GoRoute(
+        path: '/heatmap',
+        builder: (context, state) => const HeatmapScreen(),
       ),
       GoRoute(
         path: '/activity-feed',
@@ -239,6 +281,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         ),
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
       GoRoute(
+        path: '/regions',
+        builder: (context, state) => const RegionsScreen(),
+      ),
+      GoRoute(
         path: '/calendar',
         builder: (context, state) => const CalendarScreen(),
       ),
@@ -273,6 +319,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: '/map',
                 builder: (context, state) => const MapScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/trips',
+                builder: (context, state) => const MyTripsScreen(),
               ),
             ],
           ),

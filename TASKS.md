@@ -65,7 +65,7 @@ Tasks 1–21 are built in code. Phase 3's gaps (AI output repair and grounding, 
 - **Test on a phone with two accounts:** share a trip, edit it on both phones, then delete or leave it.
 
 Known limits:
-- If two people edit a shared trip at the same moment, the last save wins.
+- If two people edit a shared trip at the same moment, the edits merge stop by stop (`planner/domain/plan_merge.dart`); only an edit to the very same stop field conflicts, and then the later save wins. Merging needs a connection; offline edits merge on the next sync.
 - The owner can add any uid as a member. The rule doesn't check that they are friends.
 - Weather is shown only within 16 days of the trip. Before that, the app shows a season note instead.
 - Sharing is text or image. PDF was skipped because the PDF fonts can't render Hindi itineraries.

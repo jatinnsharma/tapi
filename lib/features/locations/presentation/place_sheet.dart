@@ -2,35 +2,53 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/services/location_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/components.dart';
-import '../../../core/theme/glass.dart';
+import '../../../core/theme/app_components.dart';
 import '../../tracking/application/tracking_service.dart';
 import '../../tracking/data/adventure_repository.dart';
 import '../../tracking/data/directions_service.dart';
 import '../../tracking/domain/trip_split.dart';
 import '../../tracking/presentation/journey_trek_breakdown.dart';
+import '../../wishlist/presentation/wishlist_button.dart';
 import '../domain/location.dart';
 import 'place_photo_gallery.dart';
+import 'location_tips_section.dart';
+import '../../ar/presentation/ar_wayfinder_screen.dart';
+import '../../lens/presentation/lens_screen.dart';
 
-/// Opens the details of a place with a one-tap **Start** that begins a
-/// tracked adventure to it, with live step-by-step directions.
+/// Opens the details of a place: photos, what it is, how to get there and
+/// tips, with **Start trip** always in reach in a sticky bar at the bottom.
+///
+/// [undiscovered] is for places still under the Map's fog: no name, photos
+/// or saving, just how far away it is and "Head that way".
 Future<void> showPlaceSheet(
   BuildContext context, {
   required ExploreLocation place,
   double? distanceKm,
+  bool undiscovered = false,
 }) {
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
+    useSafeArea: true,
     showDragHandle: true,
-    builder: (sheetContext) => _PlaceSheet(
-      place: place,
-      distanceKm: distanceKm,
-      parentContext: context,
+    builder: (sheetContext) => DraggableScrollableSheet(
+      expand: false,
+      initialChildSize: undiscovered ? 0.55 : 0.7,
+      minChildSize: 0.3,
+      maxChildSize: 1,
+      builder: (_, scrollController) => _PlaceSheet(
+        place: place,
+        distanceKm: distanceKm,
+        undiscovered: undiscovered,
+        scrollController: scrollController,
+        parentContext: context,
+      ),
     ),
   );
 }
@@ -42,8 +60,8 @@ Future<void> showPlaceSheet(
 /// [displayName] overrides the shown name, e.g. to keep an undiscovered
 /// place's name hidden.
 ///
-/// Version 1 starts trips only inside the service area (Chandigarh): from
-/// anywhere else the walking route could be hundreds of kilometres.
+/// Trips can start anywhere a location fix is available. The journey to a
+/// far-away place counts as journey, not trek (see `trip_split.dart`).
 Future<void> startTripToPlace(
   BuildContext context,
   WidgetRef ref,
@@ -94,6 +112,8 @@ class _PlaceSheet extends ConsumerWidget {
   const _PlaceSheet({
     required this.place,
     required this.distanceKm,
+    required this.undiscovered,
+    required this.scrollController,
     required this.parentContext,
   });
 
@@ -101,233 +121,344 @@ class _PlaceSheet extends ConsumerWidget {
 
   /// Straight-line distance from the user, when the caller knows it.
   final double? distanceKm;
+  final bool undiscovered;
+  final ScrollController scrollController;
 
   /// The screen that opened the sheet; used to navigate after it closes.
   final BuildContext parentContext;
 
+  /// Shown in place of the name while a place is under the fog.
+  static const unknownName = 'Unknown place';
+
+  /// AR "Point me there" only helps when the place is close by.
+  static const arMaxKm = 2.0;
+
   /// Rough walking time at 5 km/h, shown until real directions load.
-  String _walkTime(double distanceKm) {
+  static String walkTime(double distanceKm) {
     final minutes = (distanceKm / 5 * 60).round();
     if (minutes < 60) return '~$minutes min walk';
     return '~${(minutes / 60).toStringAsFixed(1)} h walk';
   }
 
-  void _start(
-    BuildContext sheetContext,
-    WidgetRef ref, {
-    required bool isMysteryHidden,
-  }) {
-    Navigator.of(sheetContext).pop();
-    startTripToPlace(
-      parentContext,
-      ref,
-      place,
-      displayName: isMysteryHidden ? 'Mystery Place' : null,
-    );
-  }
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final text = Theme.of(context).textTheme;
+    final colors = AppColors.of(context);
     final visitedIds =
         ref.watch(visitedPlaceIdsProvider).value ?? const <String>{};
     final isVisited = visitedIds.contains(place.id);
-    final isMysteryHidden = place.isMystery && !isVisited;
+    final isMysteryHidden = !undiscovered && place.isHiddenMystery(visitedIds);
 
-    final displayName = isMysteryHidden ? 'Mystery Place' : place.name;
-    final displayDescription = isMysteryHidden
-        ? (place.mysteryHint ??
-              'A secret hidden location. Walk here on foot to solve the mystery!')
+    final displayName = undiscovered ? unknownName : place.nameFor(visitedIds);
+    // The name used for the trip: kept secret until you get there.
+    final tripName = undiscovered
+        ? unknownName
+        : (isMysteryHidden ? ExploreLocation.mysteryName : null);
+    final description = isMysteryHidden
+        ? (place.mysteryHint ?? ExploreLocation.mysteryFallbackHint)
         : place.description;
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Swipe through real photos of the place; blurred if mystery and not yet visited.
-          if (isMysteryHidden)
-            Stack(
-              alignment: Alignment.center,
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(24),
-                  child: ImageFiltered(
-                    imageFilter: ui.ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-                    child: PlacePhotoGallery(place: place, height: 210),
-                  ),
+    final distance = distanceKm;
+    final metaLine = [
+      if (distance != null) '${distance.toStringAsFixed(1)} km away',
+      if (distance != null && !undiscovered) walkTime(distance),
+    ].join(' · ');
+
+    final startLabel = undiscovered
+        ? 'Head that way'
+        : (isMysteryHidden ? 'Start the hunt' : 'Start trip');
+
+    final showAr =
+        arSupported && !undiscovered && distance != null && distance <= arMaxKm;
+    final canIdentify = arSupported && !undiscovered;
+
+    return Column(
+      children: [
+        Expanded(
+          child: ListView(
+            controller: scrollController,
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+            children: [
+              if (undiscovered)
+                _UnknownPhoto(color: colors.surfaceMuted)
+              else if (isMysteryHidden)
+                _HiddenPhoto(place: place)
+              else
+                PlacePhotoGallery(place: place, height: 210),
+              const SizedBox(height: 16),
+              Text(displayName, style: text.headlineSmall),
+              const SizedBox(height: 8),
+              if (!undiscovered)
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    Tag(
+                      isMysteryHidden ? 'Mystery' : place.category.label,
+                      icon: isMysteryHidden
+                          ? Icons.help_outline_rounded
+                          : place.category.icon,
+                      tone: TagTone.brand,
+                    ),
+                    if (place.isMystery && isVisited)
+                      const Tag(
+                        'Mystery solved',
+                        icon: Icons.check_circle_rounded,
+                      )
+                    else if (place.difficulty != null)
+                      Tag(place.difficulty!, icon: Icons.terrain),
+                  ],
                 ),
-                Container(
-                  height: 210,
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(24),
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.7),
-                    borderRadius: BorderRadius.circular(24),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.lock_rounded, color: Colors.white, size: 18),
-                      SizedBox(width: 8),
-                      Text(
-                        'Photo Blurred · Walk Here to Unmask',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 12.5,
-                        ),
-                      ),
-                    ],
-                  ),
+              if (metaLine.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text(
+                  metaLine,
+                  style: text.bodyMedium?.copyWith(color: colors.textSecondary),
                 ),
               ],
-            )
-          else
-            PlacePhotoGallery(place: place, height: 210),
-          const SizedBox(height: 16),
-          Text(
-            displayName,
-            style: const TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.w800,
-              letterSpacing: -0.4,
-              color: AppTheme.ink,
-            ),
-          ),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              MetaPill(
-                icon: isMysteryHidden
-                    ? Icons.help_outline_rounded
-                    : place.category.icon,
-                label: isMysteryHidden ? 'Mystery' : place.category.label,
-                background: isMysteryHidden
-                    ? Colors.deepPurple
-                    : AppTheme.forest,
-              ),
-              if (distanceKm != null)
-                MetaPill(
-                  icon: Icons.near_me_outlined,
-                  label:
-                      '${distanceKm!.toStringAsFixed(1)} km · ${_walkTime(distanceKm!)}',
-                  background: AppTheme.primaryGreen,
+              const SizedBox(height: 16),
+              if (undiscovered)
+                Text(
+                  'Get closer to find out what this place is.',
+                  style: text.bodyLarge?.copyWith(color: colors.textSecondary),
+                )
+              else ...[
+                if (isMysteryHidden) ...[
+                  const StatusBanner(
+                    kind: StatusKind.info,
+                    title: 'A mystery place',
+                    message: 'Follow the directions to find out what\'s hidden here.',
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                _ExpandableText(description),
+                const SizedBox(height: 24),
+                TripPlanCard(
+                  place: place,
+                  straightLineKm: distanceKm,
+                  displayName: displayName,
                 ),
-              MetaPill(
-                icon: Icons.bolt_rounded,
-                label: '+${place.xpReward} XP',
-                background: AppTheme.amber,
-                foreground: AppTheme.ink,
-              ),
-              if (place.isMystery && isVisited)
-                const MetaPill(
-                  icon: Icons.check_circle_rounded,
-                  label: 'Mystery Solved',
-                  background: Colors.deepPurple,
-                ),
-              if (place.difficulty != null)
-                MetaPill(
-                  icon: Icons.terrain,
-                  label: place.difficulty!,
-                  background: AppTheme.inkMuted,
-                ),
+                if (!isMysteryHidden) ...[
+                  const SizedBox(height: 16),
+                  const Divider(),
+                  LocationTipsSection(location: place),
+                ],
+              ],
             ],
           ),
-          if (isMysteryHidden) ...[
-            const SizedBox(height: 14),
-            GlassCard(
-              tint: Colors.deepPurple,
-              padding: const EdgeInsets.all(14),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: Colors.deepPurple.withValues(alpha: 0.15),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.psychology_alt_rounded,
-                      color: Colors.deepPurple,
-                      size: 24,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Mystery Location Challenge',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w800,
-                            fontSize: 14,
-                            color: AppTheme.ink,
-                          ),
-                        ),
-                        SizedBox(height: 2),
-                        Text(
-                          'Follow the directions and explore on foot to discover what place is hidden here.',
-                          style: TextStyle(
-                            fontSize: 12.5,
-                            color: AppTheme.inkMuted,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-          const SizedBox(height: 14),
-          TripPlanCard(place: place, straightLineKm: distanceKm),
-          const SizedBox(height: 14),
-          Text(
-            displayDescription,
-            style: const TextStyle(
-              fontSize: 15,
-              height: 1.45,
-              color: AppTheme.inkMuted,
-            ),
-          ),
-          const SizedBox(height: 22),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton.icon(
-              onPressed: () =>
-                  _start(context, ref, isMysteryHidden: isMysteryHidden),
-              icon: const Icon(Icons.play_arrow_rounded),
-              label: Text(isMysteryHidden ? 'Hunt This Mystery' : 'Start'),
-              style: FilledButton.styleFrom(
-                shape: const StadiumBorder(),
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                textStyle: const TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w800,
+        ),
+        _ActionBar(
+          startLabel: startLabel,
+          xp: undiscovered ? null : place.xpReward,
+          onStart: () {
+            Navigator.of(context).pop();
+            startTripToPlace(parentContext, ref, place, displayName: tripName);
+          },
+          save: undiscovered ? null : WishlistIconButton(place: place),
+          moreItems: [
+            if (showAr)
+              (
+                icon: Icons.view_in_ar_outlined,
+                label: 'Point me there (AR)',
+                onTap: () => showArWayfinder(
+                  parentContext,
+                  name: displayName,
+                  target: LatLng(place.latitude, place.longitude),
                 ),
               ),
+            if (canIdentify)
+              (
+                icon: Icons.center_focus_strong_outlined,
+                label: 'Identify what\'s here',
+                onTap: () => showLens(parentContext, near: displayName),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+/// Blurred photos of a mystery place, with a note on how to reveal them.
+class _HiddenPhoto extends StatelessWidget {
+  const _HiddenPhoto({required this.place});
+
+  final ExploreLocation place;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          child: ImageFiltered(
+            imageFilter: ui.ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+            child: ExcludeSemantics(
+              child: PlacePhotoGallery(place: place, height: 210),
             ),
           ),
-          const SizedBox(height: 8),
-          const Center(
-            child: Text(
-              'Tracks your route and guides you there step by step.',
-              style: TextStyle(fontSize: 12.5, color: AppTheme.inkMuted),
+        ),
+        const Tag(
+          'Photo hidden until you get there',
+          icon: Icons.lock_rounded,
+          tone: TagTone.onImage,
+        ),
+      ],
+    );
+  }
+}
+
+/// A placeholder for a place still under the fog: no photo, no hints.
+class _UnknownPhoto extends StatelessWidget {
+  const _UnknownPhoto({required this.color});
+
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 140,
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+      ),
+      alignment: Alignment.center,
+      child: Icon(
+        Icons.help_outline_rounded,
+        size: 48,
+        color: AppColors.of(context).textSecondary,
+        semanticLabel: 'Unknown place',
+      ),
+    );
+  }
+}
+
+/// The first three lines, with "More" to read the rest.
+class _ExpandableText extends StatefulWidget {
+  const _ExpandableText(this.text);
+
+  final String text;
+
+  @override
+  State<_ExpandableText> createState() => _ExpandableTextState();
+}
+
+class _ExpandableTextState extends State<_ExpandableText> {
+  static const _collapsedLines = 3;
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = Theme.of(context).textTheme.bodyLarge
+        ?.copyWith(color: AppColors.of(context).textSecondary);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final painter = TextPainter(
+          text: TextSpan(text: widget.text, style: style),
+          maxLines: _collapsedLines,
+          textDirection: Directionality.of(context),
+          textScaler: MediaQuery.textScalerOf(context),
+        )..layout(maxWidth: constraints.maxWidth);
+        final overflows = painter.didExceedMaxLines;
+        painter.dispose();
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              widget.text,
+              style: style,
+              maxLines: _expanded ? null : _collapsedLines,
+              overflow: _expanded ? null : TextOverflow.ellipsis,
             ),
+            if (overflows)
+              AppButton.tertiary(
+                label: _expanded ? 'Less' : 'More',
+                onPressed: () => setState(() => _expanded = !_expanded),
+              ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+typedef _MoreItem = ({IconData icon, String label, VoidCallback onTap});
+
+/// Always visible at the bottom of the sheet: the XP on offer, the main
+/// action, save, and any extra tools.
+class _ActionBar extends StatelessWidget {
+  const _ActionBar({
+    required this.startLabel,
+    required this.onStart,
+    required this.moreItems,
+    this.xp,
+    this.save,
+  });
+
+  final String startLabel;
+  final VoidCallback onStart;
+  final int? xp;
+  final Widget? save;
+  final List<_MoreItem> moreItems;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = AppColors.of(context);
+    final text = Theme.of(context).textTheme;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colors.surface,
+        border: Border(top: BorderSide(color: colors.border)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 10, 12, 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (xp != null) ...[
+                Text(
+                  '+$xp XP when you get there',
+                  style: text.labelMedium?.copyWith(color: colors.rewardText),
+                ),
+                const SizedBox(height: 8),
+              ],
+              Row(
+                children: [
+                  Expanded(
+                    child: AppButton(
+                      label: startLabel,
+                      icon: Icons.play_arrow_rounded,
+                      expand: true,
+                      onPressed: onStart,
+                    ),
+                  ),
+                  if (save != null) ...[const SizedBox(width: 4), save!],
+                  if (moreItems.isNotEmpty)
+                    PopupMenuButton<VoidCallback>(
+                      tooltip: 'More',
+                      icon: const Icon(Icons.more_vert_rounded),
+                      onSelected: (action) => action(),
+                      itemBuilder: (_) => [
+                        for (final item in moreItems)
+                          PopupMenuItem(
+                            value: item.onTap,
+                            child: ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              leading: Icon(item.icon),
+                              title: Text(item.label),
+                            ),
+                          ),
+                      ],
+                    ),
+                ],
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -337,10 +468,18 @@ class _PlaceSheet extends ConsumerWidget {
 /// foot, from real routes), and where the trek begins. Journey figures are for
 /// planning only; trek statistics count only time on foot from the start.
 class TripPlanCard extends ConsumerWidget {
-  const TripPlanCard({super.key, required this.place, this.straightLineKm});
+  const TripPlanCard({
+    super.key,
+    required this.place,
+    this.straightLineKm,
+    this.displayName,
+  });
 
   final ExploreLocation place;
   final double? straightLineKm;
+
+  /// Overrides the shown name, e.g. to keep an unsolved mystery secret.
+  final String? displayName;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -350,127 +489,100 @@ class TripPlanCard extends ConsumerWidget {
     final value = estimate.value;
     final loading = estimate.isLoading && value == null;
 
-    return SoftCard(
+    final text = Theme.of(context).textTheme;
+    final name = displayName ?? place.name;
+    return Column(
       key: const ValueKey('trip-plan'),
-      padding: const EdgeInsets.all(14),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Expanded(child: Text('Getting there', style: text.titleMedium)),
+            AppIconButton(
+              icon: Icons.info_outline_rounded,
+              tooltip: 'How trips are counted',
+              onPressed: () => showTripRulesSheet(context, placeName: name),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        if (loading)
           const Row(
             children: [
-              Icon(Icons.route_rounded, color: AppTheme.forest, size: 20),
-              SizedBox(width: 8),
-              Text(
-                'Plan your trip',
-                style: TextStyle(
-                  color: AppTheme.ink,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
+              Expanded(child: SkeletonBox(height: 74, radius: 18)),
+              SizedBox(width: 10),
+              Expanded(child: SkeletonBox(height: 74, radius: 18)),
+            ],
+          )
+        else if (value == null || value.isEmpty)
+          _ModeTile(
+            icon: Icons.near_me_rounded,
+            title: 'Straight line',
+            detail: straightLineKm == null
+                ? 'Journey estimate unavailable right now.'
+                : 'About ${straightLineKm!.toStringAsFixed(1)} km away '
+                      'in a straight line.',
+          )
+        else
+          Row(
+            children: [
+              if (value.byCar case final car?)
+                Expanded(
+                  child: _ModeTile(
+                    icon: Icons.directions_car_filled_rounded,
+                    title: 'By car',
+                    value: formatTripDistance(car.meters),
+                    detail: '~${formatTripDuration(car.duration)}',
+                  ),
                 ),
-              ),
+              if (value.byCar != null && value.onFoot != null)
+                const SizedBox(width: 10),
+              if (value.onFoot case final foot?)
+                Expanded(
+                  child: _ModeTile(
+                    icon: Icons.directions_walk_rounded,
+                    title: 'On foot',
+                    value: formatTripDistance(foot.meters),
+                    detail: '~${formatTripDuration(foot.duration)}',
+                  ),
+                ),
             ],
           ),
-          const SizedBox(height: 4),
-          const Text(
-            'Journey: getting there by any transport',
-            style: TextStyle(color: AppTheme.inkMuted, fontSize: 12.5),
-          ),
-          const SizedBox(height: 10),
-          if (loading)
-            const Row(
-              children: [
-                Expanded(child: SkeletonBox(height: 74, radius: 18)),
-                SizedBox(width: 10),
-                Expanded(child: SkeletonBox(height: 74, radius: 18)),
-              ],
-            )
-          else if (value == null || value.isEmpty)
-            _ModeTile(
-              icon: Icons.near_me_rounded,
-              title: 'Straight line',
-              detail: straightLineKm == null
-                  ? 'Journey estimate unavailable right now.'
-                  : 'About ${straightLineKm!.toStringAsFixed(1)} km away '
-                        'in a straight line.',
-            )
-          else
-            Row(
-              children: [
-                if (value.byCar case final car?)
-                  Expanded(
-                    child: _ModeTile(
-                      icon: Icons.directions_car_filled_rounded,
-                      title: 'By car',
-                      value: formatTripDistance(car.meters),
-                      detail: '~${formatTripDuration(car.duration)}',
-                    ),
-                  ),
-                if (value.byCar != null && value.onFoot != null)
-                  const SizedBox(width: 10),
-                if (value.onFoot case final foot?)
-                  Expanded(
-                    child: _ModeTile(
-                      icon: Icons.directions_walk_rounded,
-                      title: 'On foot',
-                      value: formatTripDistance(foot.meters),
-                      detail: '~${formatTripDuration(foot.duration)}',
-                    ),
-                  ),
-              ],
-            ),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  AppTheme.emerald.withValues(alpha: 0.16),
-                  AppTheme.emerald.withValues(alpha: 0.06),
-                ],
-              ),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: AppTheme.emerald.withValues(alpha: 0.25),
-              ),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: 34,
-                  height: 34,
-                  decoration: const BoxDecoration(
-                    color: AppTheme.emerald,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.hiking_rounded,
-                    color: Colors.white,
-                    size: 19,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'Trek starts within '
-                    '${TripSplit.trekStartRadiusMeters.round()} m of '
-                    '${place.name}. Only your time on foot from there counts '
-                    'as trek, for stats and achievements.',
-                    style: const TextStyle(
-                      color: AppTheme.ink,
-                      height: 1.35,
-                      fontSize: 13,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
+      ],
     );
   }
+}
+
+/// Explains, once and out of the way, how a trip is split into the journey
+/// (any transport, for planning) and the trek (on foot, for stats).
+Future<void> showTripRulesSheet(
+  BuildContext context, {
+  required String placeName,
+}) {
+  final style = Theme.of(context).textTheme.bodyLarge;
+  return showAppSheet<void>(
+    context,
+    title: 'How trips are counted',
+    body: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Your trek starts within '
+          '${TripSplit.trekStartRadiusMeters.round()} m of $placeName. '
+          'Only your time on foot from there counts for trek stats and '
+          'achievements.',
+          style: style,
+        ),
+        const SizedBox(height: 12),
+        Text(
+          'Getting there by car, bus or on foot is your journey. It\'s shown '
+          'to help you plan, and you can start from anywhere.',
+          style: style,
+        ),
+      ],
+    ),
+  );
 }
 
 class _ModeTile extends StatelessWidget {
@@ -492,47 +604,30 @@ class _ModeTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = AppColors.of(context);
+    final text = Theme.of(context).textTheme;
+    final brand = Theme.of(context).colorScheme.primary;
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppTheme.forest.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppTheme.forest.withValues(alpha: 0.08)),
+        color: colors.surfaceMuted,
+        borderRadius: BorderRadius.circular(AppRadius.md),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(icon, size: 17, color: AppTheme.forest),
+              Icon(icon, size: 18, color: brand),
               const SizedBox(width: 6),
-              Text(
-                title,
-                style: const TextStyle(
-                  color: AppTheme.forest,
-                  fontWeight: FontWeight.w800,
-                  fontSize: 12.5,
-                ),
-              ),
+              Text(title, style: text.labelLarge?.copyWith(color: brand)),
             ],
           ),
           const SizedBox(height: 6),
-          if (value case final v?)
-            Text(
-              v,
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                color: AppTheme.ink,
-              ),
-            ),
+          if (value case final v?) Text(v, style: text.titleMedium),
           Text(
             detail,
-            style: const TextStyle(
-              fontSize: 12.5,
-              color: AppTheme.inkMuted,
-              fontWeight: FontWeight.w600,
-            ),
+            style: text.bodySmall?.copyWith(color: colors.textSecondary),
           ),
         ],
       ),

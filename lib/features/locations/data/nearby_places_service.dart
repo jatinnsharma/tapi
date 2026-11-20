@@ -27,6 +27,7 @@ class NearbyPlacesService {
   final LocationRepository _repository;
 
   /// Public Overpass instances, tried in order until one answers.
+  static const overpassEndpoints = _endpoints;
   static const _endpoints = [
     'https://overpass-api.de/api/interpreter',
     'https://maps.mail.ru/osm/tools/overpass/api/interpreter',

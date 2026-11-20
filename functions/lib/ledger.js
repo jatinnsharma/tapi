@@ -1,6 +1,6 @@
 import { evaluateTrip } from './evaluate_trip.js';
 
-/** The day a trip counts toward, in India time (the app is Chandigarh-only). */
+/** The day a trip counts toward, in India time (the app covers India). */
 export function dayKey(ms) {
   return new Date(ms + 330 * 60000).toISOString().slice(0, 10);
 }

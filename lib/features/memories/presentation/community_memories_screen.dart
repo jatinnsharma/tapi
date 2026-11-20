@@ -5,11 +5,11 @@ import 'package:go_router/go_router.dart';
 import '../../../core/services/firebase_status.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/components.dart';
-import '../../../core/theme/glass.dart';
 import '../../auth/application/auth_service.dart';
 import '../data/shared_memory_service.dart';
 import '../domain/shared_memory.dart';
 import 'memory_viewer.dart';
+import '../../../core/ui/friendly_error.dart';
 
 /// Photos and videos other explorers have shared: what your friends shared
 /// with you, or everything shared publicly.
@@ -41,7 +41,7 @@ class _CommunityMemoriesScreenState
                   icon: Icons.photo_library_outlined,
                   title: 'Sign in to watch memories',
                   message: 'See the photos and videos your friends and other explorers share.',
-                  actionLabel: firebaseReady ? 'Sign In' : null,
+                  actionLabel: firebaseReady ? 'Sign in' : null,
                   onAction: firebaseReady ? () => context.push('/login') : null,
                 ),
               ),
@@ -114,7 +114,7 @@ class _Feed extends ConsumerWidget {
           EmptyStateCard(
             icon: Icons.cloud_off_rounded,
             title: 'Could not load memories',
-            message: '$error',
+            message: friendlyError(error),
             actionLabel: 'Try again',
             onAction: () =>
                 ref.invalidate(communityMemoriesProvider(friendsOnly)),
@@ -166,49 +166,39 @@ class _Tile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return PressableScale(
+    // Flat tile, no border or shadow: the photo is the design.
+    return Semantics(
+      button: true,
+      label:
+          '${memory.isVideo ? 'Video' : 'Photo'} by ${memory.displayName}'
+          '${memory.caption?.isNotEmpty == true ? ': ${memory.caption}' : ''}',
+      excludeSemantics: true,
       child: GestureDetector(
         onTap: () => Navigator.of(context).push(
           MaterialPageRoute<void>(
             builder: (_) => SharedMemoryViewerScreen(memory: memory),
           ),
         ),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: Colors.white, width: 2),
-            boxShadow: [
-              BoxShadow(
-                color: AppTheme.forest.withValues(alpha: 0.16),
-                blurRadius: 14,
-                offset: const Offset(0, 6),
-              ),
-            ],
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(20),
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                if (memory.isVideo)
-                  const DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [AppTheme.forest, Color(0xFF17694B)],
-                      ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              if (memory.isVideo)
+                const ColoredBox(
+                  color: Color(0xFF1B1F1D),
+                  child: Center(
+                    child: Icon(
+                      Icons.play_circle_fill_rounded,
+                      color: Colors.white,
+                      size: 52,
                     ),
-                    child: Center(
-                      child: Icon(
-                        Icons.play_circle_fill_rounded,
-                        color: Colors.white,
-                        size: 52,
-                      ),
-                    ),
-                  )
-                else
-                  Image.network(
+                  ),
+                )
+              else
+                Hero(
+                  tag: 'shared-${memory.id}',
+                  child: Image.network(
                     memory.url,
                     fit: BoxFit.cover,
                     loadingBuilder: (context, child, progress) =>
@@ -220,57 +210,50 @@ class _Tile extends StatelessWidget {
                               radius: 0,
                             ),
                           ),
-                    errorBuilder: (_, _, _) => const ColoredBox(
-                      color: Color(0xFFE0E7E2),
-                      child: Icon(Icons.broken_image_outlined),
-                    ),
-                  ),
-                // Author and caption, readable on any photo.
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  child: Container(
-                    padding: const EdgeInsets.fromLTRB(12, 28, 12, 10),
-                    decoration: const BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [Color(0x00000000), Color(0xCC000000)],
-                      ),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          memory.displayName,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w800,
-                            fontSize: 14,
-                          ),
-                        ),
-                        if (memory.caption != null &&
-                            memory.caption!.isNotEmpty)
-                          Text(
-                            memory.caption!,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: Colors.white70,
-                              fontSize: 12,
-                              height: 1.25,
-                            ),
-                          ),
-                      ],
+                    errorBuilder: (_, _, _) => ColoredBox(
+                      color: AppColors.of(context).surfaceMuted,
+                      child: const Icon(Icons.broken_image_outlined),
                     ),
                   ),
                 ),
-              ],
-            ),
+              // Author and caption, readable on any photo.
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: Container(
+                  padding: const EdgeInsets.fromLTRB(12, 28, 12, 10),
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [Color(0x00000000), Color(0xCC000000)],
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        memory.displayName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.labelLarge
+                            ?.copyWith(color: Colors.white),
+                      ),
+                      if (memory.caption != null && memory.caption!.isNotEmpty)
+                        Text(
+                          memory.caption!,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: Colors.white70),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),

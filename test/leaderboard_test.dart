@@ -70,4 +70,16 @@ void main() {
       expect(board.meIsListed, isTrue);
     });
   });
+
+  test('rows are marked verified only when ranked from server XP', () {
+    final reported = rankByXp([_e('a', 'Asha', 900)], myUid: 'a');
+    expect(reported.single.verified, isFalse);
+    final verified = rankByXp(
+      [_e('a', 'Asha', 900), _e('b', 'Ben', 400)],
+      myUid: 'a',
+      verified: true,
+    );
+    expect(verified.every((e) => e.verified), isTrue);
+    expect(verified.map((e) => e.rank), [1, 2]);
+  });
 }

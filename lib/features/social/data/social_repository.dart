@@ -315,6 +315,35 @@ class SocialRepository {
         .toList();
   }
 
+  /// Live positions of a Group Adventure's members as they change (same
+  /// query as [getGroupLiveLocations]).
+  Stream<List<LiveLocation>> watchGroupLiveLocations(String groupAdventureId) {
+    return _liveLocations
+        .where('groupAdventureId', isEqualTo: groupAdventureId)
+        .where('sharing', isEqualTo: true)
+        .snapshots()
+        .map(
+          (snapshot) => [
+            for (final doc in snapshot.docs) LiveLocation.fromMap(doc.data()),
+          ],
+        );
+  }
+
+  /// Sends a quick ping to the group on the user's own live-location doc.
+  /// Throws when they aren't sharing (no doc to update).
+  Future<void> setLiveStatus(String uid, String note) {
+    return _liveLocations.doc(uid).update({
+      'statusNote': note,
+      'statusAt': DateTime.now().toIso8601String(),
+    });
+  }
+
+  /// Who created a Group Adventure (its leader), or null.
+  Future<String?> getGroupAdventureLeader(String adventureId) async {
+    final doc = await _groupAdventures.doc(adventureId).get();
+    return doc.data()?['createdBy'] as String?;
+  }
+
   /// Group Adventures (spec §40). Only `public`/`private` visibility is
   /// modeled (no `friends` level): a `friends`-scoped *listing* would need a
   /// `get()` friendship lookup per candidate document, which doesn't compose

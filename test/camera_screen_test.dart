@@ -82,6 +82,14 @@ class _FakeCamera extends CameraPlatform with MockPlatformInterfaceMixin {
 
   @override
   Future<void> dispose(int cameraId) async => disposed.add(cameraId);
+
+  final zooms = <double>[];
+  @override
+  Future<double> getMinZoomLevel(int cameraId) async => 1;
+  @override
+  Future<double> getMaxZoomLevel(int cameraId) async => 8;
+  @override
+  Future<void> setZoomLevel(int cameraId, double zoom) async => zooms.add(zoom);
 }
 
 CameraDescription _cam(String name, CameraLensDirection d) =>
@@ -119,7 +127,7 @@ void main() {
     expect(fake.opened, [CameraLensDirection.back]);
   });
 
-  testWidgets('the preview fills the whole area under the app bar', (
+  testWidgets('the preview fills the whole screen, edge to edge', (
     tester,
   ) async {
     final fake = _FakeCamera(cameras: _both);
@@ -132,7 +140,7 @@ void main() {
     expect(preview.height, greaterThanOrEqualTo(viewport.height - 0.5));
     // And the viewport is the whole body: full width, nearly full height.
     expect(viewport.width, 400);
-    expect(viewport.height, greaterThan(700));
+    expect(viewport.height, 800);
   });
 
   testWidgets('it fills the screen when the sensor reports a tall preview', (
@@ -150,13 +158,12 @@ void main() {
     expect(preview.height, greaterThanOrEqualTo(viewport.height - 0.5));
   });
 
-  testWidgets('the shutter is large and at the bottom centre', (tester) async {
+  testWidgets('the shutter is a large round button at the bottom centre', (
+    tester,
+  ) async {
     await _open(tester, _FakeCamera(cameras: _both));
-    final shutter = find.byIcon(Icons.camera_alt);
-    final size = tester.getSize(
-      find.ancestor(of: shutter, matching: find.byType(FloatingActionButton)),
-    );
-    expect(size.width, 96);
+    final shutter = find.byKey(const Key('shutter'));
+    expect(tester.getSize(shutter).width, greaterThanOrEqualTo(76));
     final center = tester.getCenter(shutter);
     expect(center.dx, closeTo(200, 1));
     expect(center.dy, greaterThan(650));
@@ -167,7 +174,7 @@ void main() {
   ) async {
     await _open(tester, _FakeCamera(cameras: _both));
     final flip = tester.getCenter(find.byIcon(Icons.cameraswitch_rounded));
-    final shutter = tester.getCenter(find.byIcon(Icons.camera_alt));
+    final shutter = tester.getCenter(find.byKey(const Key('shutter')));
     expect(flip.dx, greaterThan(300));
     expect(flip.dy, closeTo(shutter.dy, 12));
   });
@@ -208,10 +215,11 @@ void main() {
     expect(find.byIcon(Icons.cameraswitch_rounded), findsNothing);
   });
 
-  testWidgets('proof mode hides the gallery but keeps the flip', (
+  testWidgets('proof mode hides the gallery, keeps the flip, and says why', (
     tester,
   ) async {
     await _open(tester, _FakeCamera(cameras: _both), proofMode: true);
+    expect(find.text('Verification photo · location on'), findsOneWidget);
     expect(find.byIcon(Icons.photo_library_outlined), findsNothing);
     expect(find.byIcon(Icons.cameraswitch_rounded), findsOneWidget);
   });
@@ -226,6 +234,61 @@ void main() {
     final viewport = tester.getRect(find.byType(ClipRect).first);
     expect(preview.width, greaterThanOrEqualTo(viewport.width - 0.5));
     expect(preview.height, greaterThanOrEqualTo(viewport.height - 0.5));
+  });
+  testWidgets('every camera control is labelled and big enough', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    await _open(tester, _FakeCamera(cameras: _both));
+    await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
+    await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+    semantics.dispose();
+  });
+
+  testWidgets('2× zooms in, 1× back out', (tester) async {
+    final fake = _FakeCamera(cameras: _both);
+    await _open(tester, fake);
+    await tester.tap(find.bySemanticsLabel('Zoom 2×'));
+    await tester.pump();
+    expect(fake.zooms.last, 2);
+    expect(find.text('2.0×'), findsOneWidget);
+    await tester.tap(find.bySemanticsLabel('Zoom 1×'));
+    await tester.pump();
+    expect(fake.zooms.last, 1);
+  });
+
+  testWidgets('pinching zooms', (tester) async {
+    final fake = _FakeCamera(cameras: _both);
+    await _open(tester, fake);
+    final a = await tester.startGesture(const Offset(150, 400));
+    final b = await tester.startGesture(const Offset(250, 400));
+    await tester.pump();
+    await a.moveTo(const Offset(100, 400));
+    await b.moveTo(const Offset(300, 400));
+    await tester.pump();
+    await a.up();
+    await b.up();
+    // Let the double-tap detector's short wait run out.
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(fake.zooms, isNotEmpty);
+    // The pinch starts counting once the fingers have moved a little.
+    expect(fake.zooms.last, greaterThan(1.2));
+  });
+
+  testWidgets('double-tapping the picture flips the camera', (tester) async {
+    final fake = _FakeCamera(cameras: _both);
+    await _open(tester, fake);
+    await tester.tap(find.byKey(const ValueKey('preview-back')));
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.tap(find.byKey(const ValueKey('preview-back')));
+    await tester.pumpAndSettle();
+    expect(fake.opened.last, CameraLensDirection.front);
+  });
+
+  testWidgets('proof mode takes photos only', (tester) async {
+    await _open(tester, _FakeCamera(cameras: _both), proofMode: true);
+    expect(find.text('VIDEO'), findsNothing);
+    expect(find.text('Tap for photo'), findsOneWidget);
   });
 }
 

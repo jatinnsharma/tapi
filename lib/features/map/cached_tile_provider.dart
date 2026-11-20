@@ -9,6 +9,9 @@ import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import 'package:dio/dio.dart';
 
+import '../offline/data/offline_pack_store.dart';
+import 'osm_tiles.dart' show osmUserAgentPackageName;
+
 class CachedTileProvider extends TileProvider {
   static final Dio _dio = Dio();
   static String? _cacheDirectory;
@@ -23,6 +26,48 @@ class CachedTileProvider extends TileProvider {
       await dirFile.create(recursive: true);
     }
     _isInit = true;
+    // Once per app run, in the background: the cache must not grow forever.
+    unawaited(pruneTileCache(dirFile).catchError((Object _) => 0));
+  }
+
+  /// When the cache is over this size, the oldest tiles are deleted...
+  static const maxCacheBytes = 150 * 1024 * 1024;
+
+  /// ...until it is back under this size.
+  static const pruneToBytes = 100 * 1024 * 1024;
+
+  /// Deletes the least recently used tiles in [dir] (by modified time, which
+  /// a cache hit refreshes) once the total passes [maxBytes], until it is
+  /// under [targetBytes]. Returns how many files were deleted.
+  @visibleForTesting
+  static Future<int> pruneTileCache(
+    Directory dir, {
+    int maxBytes = maxCacheBytes,
+    int targetBytes = pruneToBytes,
+  }) async {
+    final tiles = <({File file, int size, DateTime modified})>[];
+    var total = 0;
+    await for (final entity in dir.list()) {
+      if (entity is! File) continue;
+      final stat = await entity.stat();
+      tiles.add((file: entity, size: stat.size, modified: stat.modified));
+      total += stat.size;
+    }
+    if (total <= maxBytes) return 0;
+
+    tiles.sort((a, b) => a.modified.compareTo(b.modified));
+    var deleted = 0;
+    for (final tile in tiles) {
+      if (total <= targetBytes) break;
+      try {
+        await tile.file.delete();
+        total -= tile.size;
+        deleted++;
+      } catch (_) {
+        // In use or already gone: skip it.
+      }
+    }
+    return deleted;
   }
 
   @override
@@ -78,6 +123,10 @@ class _CachedTileImageProvider extends ImageProvider<_CachedTileImageProvider> {
       final file = File(p.join(CachedTileProvider._cacheDirectory!, filename));
 
       if (await file.exists()) {
+        // Marks the tile as recently used, so pruning keeps it.
+        unawaited(
+          file.setLastModified(DateTime.now()).catchError((Object _) {}),
+        );
         final bytes = await file.readAsBytes();
         final buffer = await ui.ImmutableBuffer.fromUint8List(bytes);
         return await decode(buffer);
@@ -88,7 +137,9 @@ class _CachedTileImageProvider extends ImageProvider<_CachedTileImageProvider> {
         url,
         options: Options(
           responseType: ResponseType.bytes,
-          headers: {'User-Agent': 'flutter_map'},
+          headers: {
+            'User-Agent': 'Tabi/1.0 ($osmUserAgentPackageName) flutter_map',
+          },
         ),
       );
 
@@ -97,6 +148,19 @@ class _CachedTileImageProvider extends ImageProvider<_CachedTileImageProvider> {
       final buffer = await ui.ImmutableBuffer.fromUint8List(bytes);
       return await decode(buffer);
     } catch (e) {
+      // Offline (or the server failed): use a downloaded city pack's tile
+      // for this spot, if there is one.
+      try {
+        final packTile = await OfflinePackStore.instance.tileFile(
+          coordinates.z,
+          coordinates.x,
+          coordinates.y,
+        );
+        if (packTile != null) {
+          final bytes = await packTile.readAsBytes();
+          return await decode(await ui.ImmutableBuffer.fromUint8List(bytes));
+        }
+      } catch (_) {}
       // Return empty image on failure so we don't crash the map
       final emptyBytes = Uint8List.fromList([
         137,

@@ -1,6 +1,5 @@
 import 'dart:io';
 
-import 'package:firebase_auth/firebase_auth.dart' show FirebaseAuthException;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -11,14 +10,15 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/components.dart';
 import '../../../core/theme/glass.dart';
 import '../../auth/application/auth_service.dart';
-import '../../memories/data/shared_memory_service.dart';
-import '../application/footprint_service.dart';
+import '../application/friend_requests.dart';
 import '../data/social_repository.dart';
 import '../domain/explorer_profile.dart';
-import '../domain/footprint.dart';
 import '../domain/friendship.dart';
 import '../domain/live_location.dart';
 import 'friend_challenges_section.dart';
+import '../../../core/ui/confirm_destructive.dart';
+import '../../../core/ui/friendly_error.dart';
+import '../../../core/theme/app_components.dart';
 
 final _explorersProvider = FutureProvider.autoDispose<List<ExplorerProfile>>((
   ref,
@@ -28,13 +28,26 @@ final _explorersProvider = FutureProvider.autoDispose<List<ExplorerProfile>>((
   return ref.watch(socialRepositoryProvider).getAllExplorers(excludingUid: uid);
 });
 
-final _friendshipsProvider = FutureProvider.autoDispose<List<Friendship>>((
-  ref,
-) async {
-  final uid = ref.watch(authStateProvider).value?.uid;
-  if (uid == null) return [];
-  return ref.watch(socialRepositoryProvider).getFriendshipsFor(uid);
-});
+/// Profiles of your friends and of people asking to be friends, by uid.
+/// Fetched one by one when they aren't among the first explorers, so a
+/// friend or request never shows as "An explorer".
+final _peopleProvider =
+    FutureProvider.autoDispose<Map<String, ExplorerProfile>>((ref) async {
+      final uid = ref.watch(authStateProvider).value?.uid;
+      if (uid == null) return {};
+      final friendships = await ref.watch(friendshipsProvider.future);
+      final explorers = await ref.watch(_explorersProvider.future);
+      final known = {for (final e in explorers) e.uid: e};
+      final repository = ref.watch(socialRepositoryProvider);
+      final people = <String, ExplorerProfile>{};
+      for (final f in friendships) {
+        if (!f.isAccepted && !f.isIncomingFor(uid)) continue;
+        final other = f.otherUid(uid);
+        final profile = known[other] ?? await repository.getProfile(other);
+        if (profile != null) people[other] = profile;
+      }
+      return people;
+    });
 
 final _myProfileProvider = FutureProvider.autoDispose<ExplorerProfile?>((
   ref,
@@ -74,21 +87,6 @@ final _hiddenUidsProvider = FutureProvider.autoDispose<Set<String>>((
   return {...blocked, ...blockedMe};
 });
 
-final _blockedByMeProvider = FutureProvider.autoDispose<List<ExplorerProfile>>((
-  ref,
-) async {
-  final uid = ref.watch(authStateProvider).value?.uid;
-  if (uid == null) return [];
-  final repository = ref.watch(socialRepositoryProvider);
-  final blockedUids = await repository.getBlockedUids(uid);
-  final profiles = <ExplorerProfile>[];
-  for (final blockedUid in blockedUids) {
-    final profile = await repository.getProfile(blockedUid);
-    if (profile != null) profiles.add(profile);
-  }
-  return profiles;
-});
-
 /// Public (not file-private) because `ActivityFeedScreen` also needs this to
 /// filter muted authors out of the feed.
 final mutedUidsProvider = FutureProvider.autoDispose<Set<String>>((ref) async {
@@ -97,49 +95,46 @@ final mutedUidsProvider = FutureProvider.autoDispose<Set<String>>((ref) async {
   return ref.watch(socialRepositoryProvider).getMutedUids(uid);
 });
 
-final _mutedByMeProvider = FutureProvider.autoDispose<List<ExplorerProfile>>((
-  ref,
-) async {
-  final uid = ref.watch(authStateProvider).value?.uid;
-  if (uid == null) return [];
-  final repository = ref.watch(socialRepositoryProvider);
-  final mutedUids = await repository.getMutedUids(uid);
-  final profiles = <ExplorerProfile>[];
-  for (final mutedUid in mutedUids) {
-    final profile = await repository.getProfile(mutedUid);
-    if (profile != null) profiles.add(profile);
-  }
-  return profiles;
-});
-
 const _pagePadding = EdgeInsets.symmetric(horizontal: 20);
 
-/// Big "Social" title with circular header actions, shared by every state.
+/// The tab's title, shared by every state.
 class _SocialHeader extends StatelessWidget {
-  const _SocialHeader({this.actions = const []});
-
-  final List<Widget> actions;
+  const _SocialHeader();
 
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: _pagePadding,
-      child: Row(
+      child: Text('Friends', style: Theme.of(context).textTheme.headlineLarge),
+    );
+  }
+}
+
+/// Groups, meetups, leaderboard and feed as labelled shortcuts (they were
+/// four look-alike icons).
+class _SocialNav extends StatelessWidget {
+  const _SocialNav();
+
+  @override
+  Widget build(BuildContext context) {
+    final items = [
+      (Icons.diversity_3_outlined, 'Groups', '/groups'),
+      (Icons.event_available_outlined, 'Meetups', '/group-adventures'),
+      (Icons.emoji_events_outlined, 'Leaderboard', '/leaderboard'),
+      (Icons.dynamic_feed_outlined, 'Feed', '/activity-feed'),
+    ];
+    // A wrap, not a sideways scroll: all four stay visible.
+    return Padding(
+      padding: _pagePadding,
+      child: Wrap(
+        spacing: 8,
         children: [
-          const Expanded(
-            child: Text(
-              'Social',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 36,
-                fontWeight: FontWeight.w800,
-                letterSpacing: -1,
-                color: AppTheme.ink,
-              ),
+          for (final (icon, label, path) in items)
+            ActionChip(
+              avatar: Icon(icon, size: 18),
+              label: Text(label),
+              onPressed: () => context.push(path),
             ),
-          ),
-          for (final action in actions) ...[const SizedBox(width: 8), action],
         ],
       ),
     );
@@ -195,11 +190,18 @@ class _SocialSkeleton extends StatelessWidget {
   }
 }
 
-class SocialScreen extends ConsumerWidget {
+class SocialScreen extends ConsumerStatefulWidget {
   const SocialScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<SocialScreen> createState() => _SocialScreenState();
+}
+
+class _SocialScreenState extends ConsumerState<SocialScreen> {
+  String _query = '';
+
+  @override
+  Widget build(BuildContext context) {
     final firebaseReady = ref.watch(firebaseReadyProvider);
 
     if (!firebaseReady) {
@@ -208,8 +210,8 @@ class SocialScreen extends ConsumerWidget {
           icon: Icons.cloud_off_rounded,
           title: 'Social is unavailable',
           message:
-              'Firebase isn\'t configured yet, so Social features are unavailable. '
-              'See PENDING_TASKS.md for setup steps.',
+              "Friends and groups aren't available in this version of the app "
+              'yet. Everything else works without them.',
         ),
       );
     }
@@ -219,82 +221,53 @@ class SocialScreen extends ConsumerWidget {
 
     if (user == null) {
       return _SocialMessage(
-        child: EmptyStateCard(
-          icon: Icons.group_outlined,
-          title: 'Find fellow explorers',
-          message: 'Sign in to find and friend other explorers.',
-          actionLabel: 'Sign In',
-          onAction: () => context.push('/login'),
+        child: SignInPrompt(
+          reason: 'add friends, join groups and see the leaderboard',
+          onSignIn: () => context.push('/login'),
         ),
       );
     }
 
     final explorersAsync = ref.watch(_explorersProvider);
-    final friendshipsAsync = ref.watch(_friendshipsProvider);
+    final friendshipsAsync = ref.watch(friendshipsProvider);
     final hiddenUidsAsync = ref.watch(_hiddenUidsProvider);
     final mutedUidsAsync = ref.watch(mutedUidsProvider);
+    final people = ref.watch(_peopleProvider).value ?? const {};
+    final text = Theme.of(context).textTheme;
+    final colors = AppColors.of(context);
 
     void refresh() {
       ref.invalidate(_explorersProvider);
-      ref.invalidate(_friendshipsProvider);
+      ref.invalidate(friendshipsProvider);
+      ref.invalidate(_peopleProvider);
       ref.invalidate(_myProfileProvider);
       ref.invalidate(_friendsLiveProvider);
       ref.invalidate(_hiddenUidsProvider);
-      ref.invalidate(_blockedByMeProvider);
       ref.invalidate(mutedUidsProvider);
-      ref.invalidate(_mutedByMeProvider);
     }
+
+    Widget sectionTitle(String title) => Padding(
+      padding: const EdgeInsets.only(top: 24, bottom: 8),
+      child: Text(title, style: text.titleMedium),
+    );
 
     return Scaffold(
       body: SafeArea(
         bottom: false,
         child: RefreshIndicator(
-          color: AppTheme.forest,
           onRefresh: () async => refresh(),
           child: ListView(
             padding: const EdgeInsets.only(top: 12, bottom: 32),
             children: [
-              _SocialHeader(
-                actions: [
-                  RoundIconButton(
-                    icon: Icons.diversity_3_outlined,
-                    tooltip: 'Groups',
-                    size: 42,
-                    onPressed: () => context.push('/groups'),
-                  ),
-                  RoundIconButton(
-                    icon: Icons.groups_outlined,
-                    tooltip: 'Group Adventures',
-                    size: 42,
-                    onPressed: () => context.push('/group-adventures'),
-                  ),
-                  RoundIconButton(
-                    icon: Icons.dynamic_feed,
-                    tooltip: 'Activity Feed',
-                    size: 42,
-                    onPressed: () => context.push('/activity-feed'),
-                  ),
-                  // Sign out lives in the Account section at the bottom.
-                  RoundIconButton(
-                    icon: Icons.emoji_events_outlined,
-                    tooltip: 'Leaderboard',
-                    size: 42,
-                    onPressed: () => context.push('/leaderboard'),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
+              const _SocialHeader(),
+              const SizedBox(height: 8),
+              const _SocialNav(),
+              const SizedBox(height: 12),
               explorersAsync.when(
                 loading: () => const _SocialSkeleton(),
                 error: (error, stack) => Padding(
                   padding: _pagePadding,
-                  child: EmptyStateCard(
-                    icon: Icons.cloud_off_rounded,
-                    title: 'Could not load explorers',
-                    message: '$error',
-                    actionLabel: 'Try again',
-                    onAction: refresh,
-                  ),
+                  child: ErrorState(error: error, onRetry: refresh),
                 ),
                 data: (allExplorers) {
                   final friendships = friendshipsAsync.value ?? const [];
@@ -304,16 +277,48 @@ class SocialScreen extends ConsumerWidget {
                   final incoming = friendships
                       .where((f) => f.isIncomingFor(user.uid))
                       .toList();
+                  final friendUids = {
+                    for (final f in friendships)
+                      if (f.isAccepted) f.otherUid(user.uid),
+                  };
                   final hiddenUids = hiddenUidsAsync.value ?? const {};
-                  final explorers = allExplorers
-                      .where((e) => !hiddenUids.contains(e.uid))
-                      .toList();
                   final mutedUids = mutedUidsAsync.value ?? const {};
+                  final friends =
+                      [
+                        for (final uid in friendUids)
+                          if (people[uid] case final p?)
+                            if (!hiddenUids.contains(uid)) p,
+                      ]..sort(
+                        (a, b) => a.displayName.toLowerCase().compareTo(
+                          b.displayName.toLowerCase(),
+                        ),
+                      );
+                  final q = _query.trim().toLowerCase();
+                  // Everyone else: not a friend, not asking to be one.
+                  final others = allExplorers
+                      .where(
+                        (e) =>
+                            !hiddenUids.contains(e.uid) &&
+                            !friendUids.contains(e.uid) &&
+                            byOtherUid[e.uid]?.isIncomingFor(user.uid) !=
+                                true &&
+                            (q.isEmpty ||
+                                e.displayName.toLowerCase().contains(q)),
+                      )
+                      .toList();
+
+                  Widget personTile(ExplorerProfile p) => _ExplorerTile(
+                    profile: p,
+                    friendship: byOtherUid[p.uid],
+                    myUid: user.uid,
+                    isMuted: mutedUids.contains(p.uid),
+                    onChanged: refresh,
+                  );
 
                   return Padding(
                     padding: _pagePadding,
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         FadeSlideIn(
                           child: _MyProfileCard(
@@ -322,73 +327,77 @@ class SocialScreen extends ConsumerWidget {
                             onChanged: refresh,
                           ),
                         ),
-                        const SizedBox(height: 12),
-                        FadeSlideIn(
-                          delay: const Duration(milliseconds: 60),
-                          child: _FootprintPrivacyCard(
-                            uid: user.uid,
-                            fallbackName:
-                                user.email?.split('@').first ?? 'Explorer',
+                        if (incoming.isNotEmpty) ...[
+                          sectionTitle('Requests (${incoming.length})'),
+                          AppListGroup(
+                            children: [
+                              for (final request in incoming)
+                                _FriendRequestTile(
+                                  profile: people[request.otherUid(user.uid)],
+                                  onAccept: () async {
+                                    await ref
+                                        .read(socialRepositoryProvider)
+                                        .acceptFriendRequest(
+                                          user.uid,
+                                          request.otherUid(user.uid),
+                                        );
+                                    refresh();
+                                  },
+                                  onDecline: () async {
+                                    await ref
+                                        .read(socialRepositoryProvider)
+                                        .removeFriendship(
+                                          user.uid,
+                                          request.otherUid(user.uid),
+                                        );
+                                    refresh();
+                                  },
+                                ),
+                            ],
                           ),
-                        ),
+                        ],
                         const _FriendsLiveSection(),
                         const FriendChallengesSection(),
-                        if (incoming.isNotEmpty) ...[
-                          const SectionHeader(
-                            title: 'Friend Requests',
-                            padding: EdgeInsets.only(top: 24, bottom: 12),
-                          ),
-                          for (final request in incoming)
-                            _FriendRequestTile(
-                              profile: explorers
-                                  .where(
-                                    (e) => e.uid == request.otherUid(user.uid),
-                                  )
-                                  .firstOrNull,
-                              onAccept: () async {
-                                await ref
-                                    .read(socialRepositoryProvider)
-                                    .acceptFriendRequest(
-                                      user.uid,
-                                      request.otherUid(user.uid),
-                                    );
-                                refresh();
-                              },
-                              onDecline: () async {
-                                await ref
-                                    .read(socialRepositoryProvider)
-                                    .removeFriendship(
-                                      user.uid,
-                                      request.otherUid(user.uid),
-                                    );
-                                refresh();
-                              },
+                        sectionTitle(
+                          friends.isEmpty
+                              ? 'Your friends'
+                              : 'Your friends (${friends.length})',
+                        ),
+                        if (friends.isEmpty)
+                          Text(
+                            'No friends yet. Find explorers below and send a '
+                            'request.',
+                            style: text.bodyMedium?.copyWith(
+                              color: colors.textSecondary,
                             ),
-                        ],
-                        const SectionHeader(
-                          title: 'Explorers',
-                          padding: EdgeInsets.only(top: 24, bottom: 12),
-                        ),
-                        if (explorers.isEmpty)
-                          const EmptyStateCard(
-                            icon: Icons.explore_outlined,
-                            title: 'No explorers yet',
-                            message: 'No other explorers have signed up yet.',
+                          )
+                        else
+                          AppListGroup(
+                            children: [for (final p in friends) personTile(p)],
                           ),
-                        for (final explorer in explorers)
-                          _ExplorerTile(
-                            profile: explorer,
-                            friendship: byOtherUid[explorer.uid],
-                            myUid: user.uid,
-                            isMuted: mutedUids.contains(explorer.uid),
-                            onChanged: refresh,
+                        sectionTitle('Find explorers'),
+                        TextField(
+                          onChanged: (v) => setState(() => _query = v),
+                          textInputAction: TextInputAction.search,
+                          decoration: const InputDecoration(
+                            hintText: 'Search by name',
+                            prefixIcon: Icon(Icons.search_rounded),
                           ),
-                        _BlockedUsersSection(
-                          myUid: user.uid,
-                          onChanged: refresh,
                         ),
-                        _MutedUsersSection(myUid: user.uid, onChanged: refresh),
-                        _AccountSection(uid: user.uid, email: user.email),
+                        const SizedBox(height: 12),
+                        if (others.isEmpty)
+                          Text(
+                            q.isEmpty
+                                ? 'No other explorers have signed up yet.'
+                                : 'No one called "${_query.trim()}".',
+                            style: text.bodyMedium?.copyWith(
+                              color: colors.textSecondary,
+                            ),
+                          )
+                        else
+                          AppListGroup(
+                            children: [for (final p in others) personTile(p)],
+                          ),
                       ],
                     ),
                   );
@@ -397,304 +406,6 @@ class SocialScreen extends ConsumerWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-/// Sign out and account deletion (required by app stores for any app that
-/// lets people create an account).
-class _AccountSection extends ConsumerWidget {
-  const _AccountSection({required this.uid, required this.email});
-
-  final String uid;
-  final String? email;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SectionHeader(
-          title: 'Account',
-          padding: EdgeInsets.only(top: 24, bottom: 12),
-        ),
-        SoftCard(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                email ?? 'Signed in',
-                style: const TextStyle(
-                  fontWeight: FontWeight.w700,
-                  color: AppTheme.ink,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                children: [
-                  OutlinedButton.icon(
-                    onPressed: () => ref.read(authServiceProvider).signOut(),
-                    icon: const Icon(Icons.logout),
-                    label: const Text('Sign out'),
-                    style: OutlinedButton.styleFrom(
-                      shape: const StadiumBorder(),
-                    ),
-                  ),
-                  TextButton.icon(
-                    onPressed: () => showDialog<void>(
-                      context: context,
-                      builder: (_) => _DeleteAccountDialog(uid: uid),
-                    ),
-                    icon: const Icon(Icons.delete_forever_outlined),
-                    label: const Text('Delete account'),
-                    style: TextButton.styleFrom(foregroundColor: Colors.red),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _DeleteAccountDialog extends ConsumerStatefulWidget {
-  const _DeleteAccountDialog({required this.uid});
-
-  final String uid;
-
-  @override
-  ConsumerState<_DeleteAccountDialog> createState() =>
-      _DeleteAccountDialogState();
-}
-
-class _DeleteAccountDialogState extends ConsumerState<_DeleteAccountDialog> {
-  final _password = TextEditingController();
-  bool _working = false;
-  String? _error;
-
-  @override
-  void dispose() {
-    _password.dispose();
-    super.dispose();
-  }
-
-  Future<void> _delete() async {
-    setState(() {
-      _working = true;
-      _error = null;
-    });
-    final auth = ref.read(authServiceProvider);
-    final social = ref.read(socialRepositoryProvider);
-    final memories = ref.read(sharedMemoryServiceProvider);
-    final navigator = Navigator.of(context);
-    final messenger = ScaffoldMessenger.of(context);
-    try {
-      // Password first: nothing is deleted if it's wrong.
-      await auth.reauthenticate(_password.text);
-      await memories.deleteAllFor(widget.uid);
-      await social.deleteAllDataFor(widget.uid);
-      await auth.deleteCurrentUser();
-      navigator.pop();
-      messenger.showSnackBar(
-        const SnackBar(content: Text('Your account has been deleted.')),
-      );
-    } on FirebaseAuthException catch (e) {
-      setState(() {
-        _working = false;
-        _error = e.code == 'wrong-password' || e.code == 'invalid-credential'
-            ? 'That password is incorrect.'
-            : 'Could not delete the account (${e.code}). Try again.';
-      });
-    } catch (e) {
-      setState(() {
-        _working = false;
-        _error = 'Could not delete the account: $e';
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Delete your account?'),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'This permanently deletes your profile, friends, feed posts, '
-              'shared map and live location, and your sign-in. It can\'t be '
-              'undone.\n\nMessages you sent in group chats stay, under the '
-              'name you used. Adventures, places and photos stored on this '
-              'phone are not affected.',
-              style: TextStyle(height: 1.4),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _password,
-              obscureText: true,
-              enabled: !_working,
-              // Rebuild so the delete button enables once there's a password.
-              onChanged: (_) => setState(() {}),
-              decoration: const InputDecoration(
-                labelText: 'Confirm your password',
-              ),
-            ),
-            if (_error != null) ...[
-              const SizedBox(height: 10),
-              Text(_error!, style: const TextStyle(color: Colors.red)),
-            ],
-          ],
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: _working ? null : () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: _working || _password.text.isEmpty ? null : _delete,
-          style: FilledButton.styleFrom(
-            backgroundColor: Colors.red,
-            shape: const StadiumBorder(),
-          ),
-          child: _working
-              ? const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2.4,
-                    color: Colors.white,
-                  ),
-                )
-              : const Text('Delete my account'),
-        ),
-      ],
-    );
-  }
-}
-
-/// "Who can see my map": the visibility choice for the user's exploration
-/// footprint. Choosing Friends or Public uploads their routes and visited
-/// places; choosing Private clears the shared copy again.
-class _FootprintPrivacyCard extends ConsumerStatefulWidget {
-  const _FootprintPrivacyCard({required this.uid, required this.fallbackName});
-
-  final String uid;
-  final String fallbackName;
-
-  @override
-  ConsumerState<_FootprintPrivacyCard> createState() =>
-      _FootprintPrivacyCardState();
-}
-
-class _FootprintPrivacyCardState extends ConsumerState<_FootprintPrivacyCard> {
-  bool _saving = false;
-
-  Future<void> _change(FootprintVisibility visibility) async {
-    setState(() => _saving = true);
-    final messenger = ScaffoldMessenger.of(context);
-    try {
-      await ref
-          .read(footprintServiceProvider)
-          .setVisibility(
-            uid: widget.uid,
-            fallbackName: widget.fallbackName,
-            visibility: visibility,
-          );
-      ref.invalidate(myFootprintProvider);
-    } catch (e) {
-      messenger.showSnackBar(
-        SnackBar(content: Text('Could not update map visibility: $e')),
-      );
-    } finally {
-      if (mounted) setState(() => _saving = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final current =
-        ref.watch(myFootprintProvider).value?.visibility ??
-        FootprintVisibility.private;
-
-    return SoftCard(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.map_outlined, color: AppTheme.primaryGreen),
-              const SizedBox(width: 10),
-              const Expanded(
-                child: Text(
-                  'Who can see my map',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                    color: AppTheme.ink,
-                  ),
-                ),
-              ),
-              if (_saving)
-                const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2.4),
-                ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            child: SegmentedButton<FootprintVisibility>(
-              showSelectedIcon: false,
-              style: SegmentedButton.styleFrom(
-                selectedBackgroundColor: AppTheme.forest,
-                selectedForegroundColor: Colors.white,
-                foregroundColor: AppTheme.ink,
-              ),
-              segments: const [
-                ButtonSegment(
-                  value: FootprintVisibility.private,
-                  icon: Icon(Icons.lock_outline_rounded, size: 18),
-                  label: Text('Private'),
-                ),
-                ButtonSegment(
-                  value: FootprintVisibility.friends,
-                  icon: Icon(Icons.group_outlined, size: 18),
-                  label: Text('Friends'),
-                ),
-                ButtonSegment(
-                  value: FootprintVisibility.public,
-                  icon: Icon(Icons.public, size: 18),
-                  label: Text('Public'),
-                ),
-              ],
-              selected: {current},
-              onSelectionChanged: _saving
-                  ? null
-                  : (selection) => _change(selection.first),
-            ),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            current.description,
-            style: const TextStyle(
-              fontSize: 12.5,
-              height: 1.35,
-              color: AppTheme.inkMuted,
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -753,19 +464,15 @@ class _FriendsLiveSection extends ConsumerWidget {
                         children: [
                           Text(
                             '${live.displayName} is on "${live.adventureTitle}"',
-                            style: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w800,
-                              color: AppTheme.ink,
-                            ),
+                            style: Theme.of(context).textTheme.titleSmall,
                           ),
                           const SizedBox(height: 2),
                           Text(
                             'Updated ${_relativeTime(live.updatedAt)}',
-                            style: const TextStyle(
-                              fontSize: 12.5,
-                              color: AppTheme.inkMuted,
-                            ),
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(
+                                  color: AppColors.of(context).textSecondary,
+                                ),
                           ),
                         ],
                       ),
@@ -807,7 +514,7 @@ class _MyProfileCard extends ConsumerWidget {
       error: (error, stack) => EmptyStateCard(
         icon: Icons.person_off_outlined,
         title: 'Could not load your profile',
-        message: '$error',
+        message: friendlyError(error),
       ),
       data: (profile) {
         final displayName =
@@ -825,7 +532,7 @@ class _MyProfileCard extends ConsumerWidget {
                     width: 2,
                   ),
                 ),
-                child: _avatarFor(
+                child: explorerAvatar(
                   profile,
                   fallbackEmail: fallbackEmail,
                   size: 56,
@@ -840,11 +547,8 @@ class _MyProfileCard extends ConsumerWidget {
                       displayName,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 22,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.4,
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        color: Theme.of(context).colorScheme.onPrimary,
                       ),
                     ),
                     const SizedBox(height: 2),
@@ -854,9 +558,9 @@ class _MyProfileCard extends ConsumerWidget {
                           : 'No bio yet',
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.85),
-                        fontSize: 14,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.onPrimary
+                            .withValues(alpha: 0.85),
                       ),
                     ),
                   ],
@@ -1034,44 +738,15 @@ class _FriendRequestTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final name = profile?.displayName ?? 'An explorer';
-    return SoftCard(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.fromLTRB(14, 10, 6, 10),
-      radius: 22,
-      child: Row(
+    return PersonTile(
+      avatar: explorerAvatar(profile),
+      name: profile?.displayName ?? 'An explorer',
+      subtitle: 'Wants to be friends',
+      actions: Wrap(
+        spacing: 8,
         children: [
-          _avatarFor(profile),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 15.5,
-                    fontWeight: FontWeight.w800,
-                    color: AppTheme.ink,
-                  ),
-                ),
-                const Text(
-                  'wants to be friends',
-                  style: TextStyle(fontSize: 12.5, color: AppTheme.inkMuted),
-                ),
-              ],
-            ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.check_circle_rounded, color: Colors.green),
-            onPressed: onAccept,
-          ),
-          IconButton(
-            icon: const Icon(Icons.cancel_rounded, color: Colors.red),
-            onPressed: onDecline,
-          ),
+          AppButton(label: 'Accept', onPressed: onAccept),
+          AppButton.tertiary(label: 'Decline', onPressed: onDecline),
         ],
       ),
     );
@@ -1093,76 +768,53 @@ class _ExplorerTile extends ConsumerWidget {
   final bool isMuted;
   final VoidCallback onChanged;
 
+  bool get _isFriend => friendship?.isAccepted == true;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return SoftCard(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.fromLTRB(14, 10, 4, 10),
-      radius: 22,
-      child: Row(
+    final action = _buildAction(context, ref);
+    return PersonTile(
+      avatar: explorerAvatar(profile),
+      name: profile.displayName,
+      subtitle: profile.bio?.isNotEmpty == true ? profile.bio! : null,
+      // A friend's row opens their map.
+      onTap: _isFriend ? () => _openMap(context) : null,
+      // The action sits under the name, so a long name or large text never
+      // pushes it (or the name) off a small screen.
+      actions: action,
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          _avatarFor(profile),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  profile.displayName,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 15.5,
-                    fontWeight: FontWeight.w800,
-                    color: AppTheme.ink,
-                  ),
-                ),
-                Text(
-                  profile.bio?.isNotEmpty == true ? profile.bio! : 'Explorer',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 12.5,
-                    color: AppTheme.inkMuted,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          _buildAction(ref),
-          if (friendship?.isAccepted == true)
-            IconButton(
-              icon: const Icon(
-                Icons.map_outlined,
-                color: AppTheme.primaryGreen,
-              ),
-              tooltip: 'View map',
-              onPressed: () => _openMap(context),
-            ),
           PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert_rounded, color: AppTheme.inkMuted),
+            tooltip: 'More for ${profile.displayName}',
+            icon: const Icon(Icons.more_vert_rounded),
             onSelected: (value) async {
-              if (value == 'map') {
-                _openMap(context);
-              } else if (value == 'block') {
-                _confirmBlock(context, ref);
-              } else if (value == 'report') {
-                _showReportDialog(context, ref);
-              } else if (value == 'mute') {
-                await ref
-                    .read(socialRepositoryProvider)
-                    .muteUser(myUid, profile.uid);
-                onChanged();
-              } else if (value == 'unmute') {
-                await ref
-                    .read(socialRepositoryProvider)
-                    .unmuteUser(myUid, profile.uid);
-                onChanged();
+              final repository = ref.read(socialRepositoryProvider);
+              switch (value) {
+                case 'map':
+                  _openMap(context);
+                case 'unfriend':
+                  await _confirmUnfriend(context, ref);
+                case 'block':
+                  await _confirmBlock(context, ref);
+                case 'report':
+                  _showReportDialog(context, ref);
+                case 'mute':
+                  await repository.muteUser(myUid, profile.uid);
+                  onChanged();
+                case 'unmute':
+                  await repository.unmuteUser(myUid, profile.uid);
+                  onChanged();
               }
             },
             itemBuilder: (context) => [
-              const PopupMenuItem(value: 'map', child: Text('View map')),
+              if (_isFriend) ...[
+                const PopupMenuItem(value: 'map', child: Text('View map')),
+                const PopupMenuItem(
+                  value: 'unfriend',
+                  child: Text('Remove friend'),
+                ),
+              ],
               PopupMenuItem(
                 value: isMuted ? 'unmute' : 'mute',
                 child: Text(isMuted ? 'Unmute' : 'Mute'),
@@ -1176,40 +828,40 @@ class _ExplorerTile extends ConsumerWidget {
     );
   }
 
+  Future<void> _confirmUnfriend(BuildContext context, WidgetRef ref) async {
+    final ok = await confirmDestructive(
+      context,
+      title: 'Remove ${profile.displayName} as a friend?',
+      message:
+          "You'll stop seeing each other's friends-only posts, map and "
+          'live location. You can send a new request later.',
+      confirmLabel: 'Remove friend',
+    );
+    if (!ok) return;
+    await ref
+        .read(socialRepositoryProvider)
+        .removeFriendship(myUid, profile.uid);
+    onChanged();
+  }
+
   void _openMap(BuildContext context) {
     context.push(
       '/footprint/${profile.uid}?name=${Uri.encodeComponent(profile.displayName)}',
     );
   }
 
-  void _confirmBlock(BuildContext context, WidgetRef ref) {
-    showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Block this explorer?'),
-        content: Text(
-          'You and ${profile.displayName} will no longer see each other as friends or in '
-          'each other\'s Explorers list. You can unblock them later.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              await ref
-                  .read(socialRepositoryProvider)
-                  .blockUser(myUid, profile.uid);
-              onChanged();
-              if (context.mounted) Navigator.of(context).pop();
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Block'),
-          ),
-        ],
-      ),
+  Future<void> _confirmBlock(BuildContext context, WidgetRef ref) async {
+    final ok = await confirmDestructive(
+      context,
+      title: 'Block ${profile.displayName}?',
+      message:
+          'You won\'t see each other as friends or in search. You can '
+          'unblock them in Settings → Privacy.',
+      confirmLabel: 'Block',
     );
+    if (!ok) return;
+    await ref.read(socialRepositoryProvider).blockUser(myUid, profile.uid);
+    onChanged();
   }
 
   void _showReportDialog(BuildContext context, WidgetRef ref) {
@@ -1228,7 +880,7 @@ class _ExplorerTile extends ConsumerWidget {
             onPressed: () => Navigator.of(context).pop(),
             child: const Text('Cancel'),
           ),
-          ElevatedButton(
+          FilledButton(
             onPressed: () async {
               await ref
                   .read(socialRepositoryProvider)
@@ -1253,195 +905,41 @@ class _ExplorerTile extends ConsumerWidget {
     );
   }
 
-  Widget _buildAction(WidgetRef ref) {
+  /// Add, or Requested (tap to cancel, with a confirm). Friends need no
+  /// button: removing one is in the ⋮ menu.
+  Widget? _buildAction(BuildContext context, WidgetRef ref) {
     final repository = ref.read(socialRepositoryProvider);
-
     if (friendship == null) {
-      return FilledButton(
+      return AppButton(
+        label: 'Add',
+        icon: Icons.person_add_alt_1_outlined,
         onPressed: () async {
           await repository.sendFriendRequest(myUid, profile.uid);
           onChanged();
         },
-        style: _pillStyle(filled: true),
-        child: const Text('Add Friend'),
       );
     }
-
-    if (friendship!.isAccepted) {
-      return OutlinedButton(
-        onPressed: () async {
-          await repository.removeFriendship(myUid, profile.uid);
-          onChanged();
-        },
-        style: _pillStyle(),
-        child: const Text('Friends'),
-      );
-    }
-
     if (friendship!.isOutgoingFor(myUid)) {
-      return OutlinedButton(
+      return AppButton.secondary(
+        label: 'Requested',
         onPressed: () async {
+          final ok = await confirmDestructive(
+            context,
+            title: 'Cancel your friend request?',
+            message: '${profile.displayName} will no longer see it.',
+            confirmLabel: 'Cancel request',
+          );
+          if (!ok) return;
           await repository.removeFriendship(myUid, profile.uid);
           onChanged();
         },
-        style: _pillStyle(),
-        child: const Text('Requested'),
       );
     }
-
-    // Incoming request — already surfaced in the "Friend Requests" section.
-    return const Text(
-      'Respond above',
-      style: TextStyle(fontSize: 12.5, color: AppTheme.inkMuted),
-    );
+    return null;
   }
 }
 
-ButtonStyle _pillStyle({bool filled = false}) {
-  final shape = const StadiumBorder();
-  const padding = EdgeInsets.symmetric(horizontal: 16, vertical: 0);
-  const minimumSize = Size(0, 36);
-  return filled
-      ? FilledButton.styleFrom(
-          shape: shape,
-          padding: padding,
-          minimumSize: minimumSize,
-          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        )
-      : OutlinedButton.styleFrom(
-          shape: shape,
-          padding: padding,
-          minimumSize: minimumSize,
-          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        );
-}
-
-class _BlockedUsersSection extends ConsumerWidget {
-  const _BlockedUsersSection({required this.myUid, required this.onChanged});
-
-  final String myUid;
-  final VoidCallback onChanged;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final blockedAsync = ref.watch(_blockedByMeProvider);
-
-    return blockedAsync.when(
-      loading: () => const SizedBox.shrink(),
-      error: (error, stack) => const SizedBox.shrink(),
-      data: (blocked) {
-        if (blocked.isEmpty) return const SizedBox.shrink();
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SectionHeader(
-              title: 'Blocked (${blocked.length})',
-              padding: const EdgeInsets.only(top: 24, bottom: 12),
-            ),
-            for (final profile in blocked)
-              _ManagedUserTile(
-                profile: profile,
-                actionLabel: 'Unblock',
-                onPressed: () async {
-                  await ref
-                      .read(socialRepositoryProvider)
-                      .unblockUser(myUid, profile.uid);
-                  onChanged();
-                },
-              ),
-          ],
-        );
-      },
-    );
-  }
-}
-
-class _MutedUsersSection extends ConsumerWidget {
-  const _MutedUsersSection({required this.myUid, required this.onChanged});
-
-  final String myUid;
-  final VoidCallback onChanged;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final mutedAsync = ref.watch(_mutedByMeProvider);
-
-    return mutedAsync.when(
-      loading: () => const SizedBox.shrink(),
-      error: (error, stack) => const SizedBox.shrink(),
-      data: (muted) {
-        if (muted.isEmpty) return const SizedBox.shrink();
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SectionHeader(
-              title: 'Muted (${muted.length})',
-              padding: const EdgeInsets.only(top: 24, bottom: 12),
-            ),
-            for (final profile in muted)
-              _ManagedUserTile(
-                profile: profile,
-                actionLabel: 'Unmute',
-                onPressed: () async {
-                  await ref
-                      .read(socialRepositoryProvider)
-                      .unmuteUser(myUid, profile.uid);
-                  onChanged();
-                },
-              ),
-          ],
-        );
-      },
-    );
-  }
-}
-
-/// Row used by the Blocked / Muted lists: avatar, name and one action.
-class _ManagedUserTile extends StatelessWidget {
-  const _ManagedUserTile({
-    required this.profile,
-    required this.actionLabel,
-    required this.onPressed,
-  });
-
-  final ExplorerProfile profile;
-  final String actionLabel;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return SoftCard(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      radius: 22,
-      child: Row(
-        children: [
-          _avatarFor(profile),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Text(
-              profile.displayName,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 15.5,
-                fontWeight: FontWeight.w800,
-                color: AppTheme.ink,
-              ),
-            ),
-          ),
-          OutlinedButton(
-            onPressed: onPressed,
-            style: _pillStyle(),
-            child: Text(actionLabel),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-Widget _avatarFor(
+Widget explorerAvatar(
   ExplorerProfile? profile, {
   String? fallbackEmail,
   double size = 44,

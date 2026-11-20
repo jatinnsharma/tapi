@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/services/location_service.dart';
+import '../../../core/theme/app_components.dart';
 import '../../../core/theme/app_theme.dart';
 import '../application/onboarding_service.dart';
 
@@ -21,15 +22,13 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     _OnboardingPageData(
       icon: Icons.explore_rounded,
       iconColor: AppTheme.primaryGreen,
-      gradient: [Color(0xFFE8F5E9), Color(0xFFC8E6C9)],
       title: 'Welcome to Tabi',
       subtitle: 'Turn every step into an adventure',
-      description: 'Discover hidden gardens, scenic walking trails, local markets, and heritage viewpoints across Chandigarh. Step outside and explore the city on foot.',
+      description: 'Discover hidden gardens, scenic walking trails, local markets, and heritage viewpoints across India. Step outside and explore wherever you are on foot.',
     ),
     _OnboardingPageData(
       icon: Icons.camera_alt_rounded,
       iconColor: AppTheme.amberText,
-      gradient: [Color(0xFFFFF8E1), Color(0xFFFFECB3)],
       title: 'How XP Works',
       subtitle: 'Real walking & authentic visits',
       description: 'Earn XP by walking genuine distances to real places. When you arrive, snap a live camera photo at the location to verify your visit, level up your rank, and collect badges.',
@@ -37,20 +36,31 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     _OnboardingPageData(
       icon: Icons.location_on_rounded,
       iconColor: AppTheme.emerald,
-      gradient: [Color(0xFFE0F2F1), Color(0xFFB2DFDB)],
       title: 'Why Location Matters',
       subtitle: 'Private, local GPS tracking',
       description: 'Tabi uses your location while exploring to trace your walking path, reveal undiscovered places nearby, and verify your place check-ins. Your trip routes stay private on your phone.',
     ),
   ];
 
-  Future<void> _finishOnboarding() async {
+  bool _finishing = false;
+
+  /// Ends onboarding. Location is asked only when the user finished the
+  /// explanation ([askLocation]); "Skip" means "not now", so it doesn't
+  /// spring the system prompt on them (the app asks again when it needs it).
+  /// A second tap while finishing is ignored, and a failed permission
+  /// request never leaves the user stuck here.
+  Future<void> _finishOnboarding({bool askLocation = true}) async {
+    if (_finishing) return;
+    setState(() => _finishing = true);
     await ref.read(onboardingCompletedProvider.notifier).completeOnboarding();
-    // Request permission right after the explanation screen
-    await ref.read(locationServiceProvider).requestPermission();
-    if (mounted) {
-      context.go('/explore');
+    if (askLocation) {
+      try {
+        await ref.read(locationServiceProvider).requestPermission();
+      } catch (_) {
+        // The app asks again where it needs location.
+      }
     }
+    if (mounted) context.go('/explore');
   }
 
   void _nextPage() {
@@ -72,6 +82,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    final colors = AppColors.of(context);
+    final last = _currentPage == _pages.length - 1;
     return Scaffold(
       body: SafeArea(
         child: Column(
@@ -79,19 +92,12 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
             Align(
               alignment: Alignment.topRight,
               child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 8,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 child: TextButton(
-                  onPressed: _finishOnboarding,
-                  child: const Text(
-                    'Skip',
-                    style: TextStyle(
-                      color: AppTheme.inkMuted,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
+                  onPressed: _finishing
+                      ? null
+                      : () => _finishOnboarding(askLocation: false),
+                  child: const Text('Skip'),
                 ),
               ),
             ),
@@ -102,116 +108,92 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 onPageChanged: (index) => setState(() => _currentPage = index),
                 itemBuilder: (context, index) {
                   final page = _pages[index];
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 28),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Container(
-                          width: 140,
-                          height: 140,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: LinearGradient(
-                              colors: page.gradient,
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
+                  // Scrolls on small phones with large text instead of
+                  // overflowing.
+                  return Center(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.symmetric(horizontal: 28),
+                      child: Column(
+                        children: [
+                          Container(
+                            width: 140,
+                            height: 140,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: page.iconColor.withValues(alpha: 0.12),
                             ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: page.iconColor.withValues(alpha: 0.15),
-                                blurRadius: 24,
-                                offset: const Offset(0, 10),
-                              ),
-                            ],
+                            child: Icon(
+                              page.icon,
+                              size: 68,
+                              color: page.iconColor,
+                            ),
                           ),
-                          child: Icon(
-                            page.icon,
-                            size: 68,
-                            color: page.iconColor,
+                          const SizedBox(height: 32),
+                          Semantics(
+                            header: true,
+                            child: Text(
+                              page.title,
+                              textAlign: TextAlign.center,
+                              style: text.headlineMedium,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 36),
-                        Text(
-                          page.title,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            fontSize: 26,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: -0.5,
-                            color: AppTheme.ink,
+                          const SizedBox(height: 8),
+                          Text(
+                            page.subtitle,
+                            textAlign: TextAlign.center,
+                            style: text.titleMedium?.copyWith(
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          page.subtitle,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color: AppTheme.primaryGreen,
+                          const SizedBox(height: 16),
+                          Text(
+                            page.description,
+                            textAlign: TextAlign.center,
+                            style: text.bodyLarge?.copyWith(
+                              color: colors.textSecondary,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 18),
-                        Text(
-                          page.description,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            fontSize: 15,
-                            height: 1.45,
-                            color: AppTheme.inkMuted,
-                          ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   );
                 },
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(28, 0, 28, 36),
+              padding: const EdgeInsets.fromLTRB(28, 8, 28, 24),
               child: Column(
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: List.generate(
-                      _pages.length,
-                      (index) => AnimatedContainer(
-                        duration: const Duration(milliseconds: 250),
-                        margin: const EdgeInsets.symmetric(horizontal: 4),
-                        width: _currentPage == index ? 24 : 8,
-                        height: 8,
-                        decoration: BoxDecoration(
-                          color: _currentPage == index
-                              ? AppTheme.primaryGreen
-                              : AppTheme.inkMuted.withValues(alpha: 0.25),
-                          borderRadius: BorderRadius.circular(4),
+                  Semantics(
+                    label: 'Page ${_currentPage + 1} of ${_pages.length}',
+                    excludeSemantics: true,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: List.generate(
+                        _pages.length,
+                        (index) => AnimatedContainer(
+                          duration: AppMotion.base,
+                          margin: const EdgeInsets.symmetric(horizontal: 4),
+                          width: _currentPage == index ? 24 : 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            color: _currentPage == index
+                                ? Theme.of(context).colorScheme.primary
+                                : colors.border,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
                         ),
                       ),
                     ),
                   ),
-                  const SizedBox(height: 28),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 52,
-                    child: FilledButton(
-                      onPressed: _nextPage,
-                      style: FilledButton.styleFrom(
-                        backgroundColor: AppTheme.forest,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(26),
-                        ),
-                      ),
-                      child: Text(
-                        _currentPage == _pages.length - 1
-                            ? 'Enable Location & Start Exploring'
-                            : 'Continue',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
+                  const SizedBox(height: 24),
+                  AppButton(
+                    label: last
+                        ? 'Enable Location & Start Exploring'
+                        : 'Continue',
+                    expand: true,
+                    loading: _finishing,
+                    onPressed: _nextPage,
                   ),
                 ],
               ),
@@ -227,7 +209,6 @@ class _OnboardingPageData {
   const _OnboardingPageData({
     required this.icon,
     required this.iconColor,
-    required this.gradient,
     required this.title,
     required this.subtitle,
     required this.description,
@@ -235,7 +216,6 @@ class _OnboardingPageData {
 
   final IconData icon;
   final Color iconColor;
-  final List<Color> gradient;
   final String title;
   final String subtitle;
   final String description;

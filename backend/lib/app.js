@@ -1,8 +1,13 @@
 import express from 'express';
 import { signedQuery, verifyMediaLink } from './media_token.js';
 import {
-  MAX_FILE_BYTES, MAX_MEMORIES_PER_USER, VISIBILITIES,
-  contentTypeAllowed, isValidId, parseRange, parseShareFields, parseUidList,
+  LENS_IMAGE_TYPES, LENS_MAX_BYTES, createDailyLimiter, parseLensAnswer,
+} from './lens.js';
+import {
+  CAPSULE_SPOT_METERS, MAX_CAPSULES_PER_SPOT, MAX_FILE_BYTES,
+  MAX_MEMORIES_PER_USER, MAX_NEARBY_METERS, MAX_VOICE_BYTES, REPORTS_TO_HIDE,
+  VISIBILITIES, contentTypeAllowed, geoPoint, isValidId, parseRange,
+  parseShareFields, parseUidList,
 } from './validate.js';
 
 /**
@@ -15,7 +20,10 @@ import {
  * if it is "friends" and its owner is in the user's friends list. If `getFriends`
  * is provided, friendships are verified server-side (e.g. from Firestore).
  */
-export function createApp({ verifyToken, store, mediaSecret, maxFileBytes = MAX_FILE_BYTES, getFriends }) {
+export function createApp({
+  verifyToken, store, mediaSecret, maxFileBytes = MAX_FILE_BYTES, getFriends,
+  askVision, lensLimiter = createDailyLimiter(),
+}) {
   const app = express();
   app.disable('x-powered-by');
   app.use((_req, res, next) => {
@@ -109,6 +117,70 @@ export function createApp({ verifyToken, store, mediaSecret, maxFileBytes = MAX_
     res.json({ memories: items.map(present) });
   }));
 
+  // Sightseer Lens: the body is the photo; lat, lng and near (a place name)
+  // help identify it. The Gemini key stays on this server.
+  app.post('/lens', auth, express.raw({ type: LENS_IMAGE_TYPES, limit: LENS_MAX_BYTES }),
+    wrap(async (req, res) => {
+      if (!askVision) return fail(res, 503, 'The lens is not set up on this server yet.');
+      const type = String(req.get('content-type') ?? '').split(';')[0].trim().toLowerCase();
+      if (!LENS_IMAGE_TYPES.includes(type) || !Buffer.isBuffer(req.body) || req.body.length === 0) {
+        return fail(res, 415, 'Send a JPEG, PNG or WebP photo.');
+      }
+      if (!lensLimiter(req.uid)) {
+        return fail(res, 429, 'You have used the lens a lot today. Try again tomorrow.');
+      }
+      const lat = Number(req.query.lat);
+      const lng = Number(req.query.lng);
+      const near = typeof req.query.near === 'string' ? req.query.near.slice(0, 120) : null;
+      let raw;
+      try {
+        raw = await askVision(req.body, type, {
+          lat: Number.isFinite(lat) ? lat : NaN,
+          lng: Number.isFinite(lng) ? lng : NaN,
+          near,
+        });
+      } catch {
+        return fail(res, 502, 'The lens could not answer right now. Try again.');
+      }
+      const answer = parseLensAnswer(raw);
+      if (!answer) return fail(res, 502, 'The lens could not make sense of this photo.');
+      res.json(answer);
+    }));
+
+  // Audio capsules near a spot, nearest first: public ones, and friends'.
+  app.get('/memories/nearby', auth, wrap(async (req, res) => {
+    const lat = Number(req.query.lat);
+    const lng = Number(req.query.lng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng) ||
+        Math.abs(lat) > 90 || Math.abs(lng) > 180) {
+      return fail(res, 400, 'lat and lng are required');
+    }
+    const asked = Number(req.query.radius);
+    const radius = Number.isFinite(asked) && asked > 0
+      ? Math.min(asked, MAX_NEARBY_METERS)
+      : 500;
+    const friends = getFriends
+      ? (await getFriends(req.uid)).filter((u) => u !== req.uid)
+      : [];
+    const items = await store.listCapsulesNear(lat, lng, radius, [...friends, req.uid], 50);
+    res.json({ memories: items.map(present) });
+  }));
+
+  // Report someone else's shared memory. After enough different people
+  // report it, it is hidden from every feed (kept for review).
+  app.post('/memories/:id/report', auth, wrap(async (req, res) => {
+    const { id } = req.params;
+    if (!isValidId(id)) return fail(res, 400, 'Bad memory id.');
+    const existing = await store.getMemory(id);
+    if (!existing) return fail(res, 404, 'Not found.');
+    if (existing.uid === req.uid) return fail(res, 400, "You can't report your own memory.");
+    const count = await store.addReport(id, req.uid);
+    if (count >= REPORTS_TO_HIDE && !existing.hidden) {
+      await store.updateMemory(id, { hidden: true });
+    }
+    res.json({ reported: true });
+  }));
+
   // Share (or replace) a memory: the body is the file itself.
   app.put('/memories/:id', auth, wrap(async (req, res) => {
     const { id } = req.params;
@@ -121,9 +193,14 @@ export function createApp({ verifyToken, store, mediaSecret, maxFileBytes = MAX_
     if (!contentTypeAllowed(fields.type, contentType)) {
       return fail(res, 415, `That is not a ${fields.type} file.`);
     }
+    const isVoice = fields.type === 'voice';
+    const limit = isVoice ? Math.min(MAX_VOICE_BYTES, maxFileBytes) : maxFileBytes;
+    const tooBig = isVoice
+      ? 'That voice note is over 5 MB, too long for a capsule.'
+      : 'That file is over 50 MB, too big to share.';
     const declared = Number(req.get('content-length'));
-    if (Number.isFinite(declared) && declared > maxFileBytes) {
-      return fail(res, 413, 'That file is over 50 MB, too big to share.');
+    if (Number.isFinite(declared) && declared > limit) {
+      return fail(res, 413, tooBig);
     }
 
     const existing = await store.getMemory(id);
@@ -131,12 +208,17 @@ export function createApp({ verifyToken, store, mediaSecret, maxFileBytes = MAX_
     if (!existing && (await store.countByOwner(req.uid)) >= MAX_MEMORIES_PER_USER) {
       return fail(res, 429, `You can share up to ${MAX_MEMORIES_PER_USER} memories. Delete some first.`);
     }
+    if (!existing && isVoice && (await store.countOwnerCapsulesNear(
+      req.uid, fields.latitude, fields.longitude, CAPSULE_SPOT_METERS,
+    )) >= MAX_CAPSULES_PER_SPOT) {
+      return fail(res, 429, `You already left ${MAX_CAPSULES_PER_SPOT} capsules here.`);
+    }
 
     let saved;
     try {
-      saved = await store.saveFile(req, { uid: req.uid, contentType, maxBytes: maxFileBytes });
+      saved = await store.saveFile(req, { uid: req.uid, contentType, maxBytes: limit });
     } catch (e) {
-      if (e?.code === 'TOO_BIG') return fail(res, 413, 'That file is over 50 MB, too big to share.');
+      if (e?.code === 'TOO_BIG') return fail(res, 413, tooBig);
       throw e;
     }
     if (saved.length === 0) {
@@ -145,6 +227,11 @@ export function createApp({ verifyToken, store, mediaSecret, maxFileBytes = MAX_
     }
 
     const doc = { _id: id, uid: req.uid, fileId: saved.fileId, contentType, ...fields };
+    const geo = geoPoint(fields.latitude, fields.longitude);
+    if (geo) doc.geo = geo;
+    // Replacing a memory keeps the reports made against it.
+    if (existing?.reportedBy) doc.reportedBy = existing.reportedBy;
+    if (existing?.hidden) doc.hidden = true;
     await store.upsertMemory(doc);
     if (existing) await store.deleteFile(existing.fileId);
     res.status(existing ? 200 : 201).json(present(doc));

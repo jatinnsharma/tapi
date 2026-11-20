@@ -32,6 +32,7 @@ import 'start_adventure_view.dart';
 import 'trip_not_counted_checklist.dart';
 
 import 'trip_share_sheet.dart';
+import '../../../core/ui/confirm_destructive.dart';
 
 part 'navigation_view.dart';
 
@@ -344,7 +345,15 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
                 }
               },
               onDiscard: () async {
-                await trackingService.discardAdventure();
+                final ok = await confirmDestructive(
+                  context,
+                  title: 'Discard this trip?',
+                  message:
+                      "The trip's route and time are deleted. Photos you "
+                      "took stay in Memories. This can't be undone.",
+                  confirmLabel: 'Discard trip',
+                );
+                if (ok) await trackingService.discardAdventure();
               },
             );
             return Column(

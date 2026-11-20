@@ -1,12 +1,8 @@
-import 'dart:io';
-import 'dart:ui' as ui;
-
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:intl/intl.dart';
-import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
+
+import '../../../core/ui/share_card.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../domain/trip_extras.dart';
@@ -58,91 +54,21 @@ Future<void> shareTripAsText(TripPlan plan) {
   );
 }
 
-/// Opens a preview of the itinerary card with a button that shares it as an
-/// image.
+/// Shares the itinerary as an image (or its text), from the shared share
+/// sheet.
 Future<void> showTripImageShare(BuildContext context, TripPlan plan) {
-  return Navigator.of(context).push(
-    MaterialPageRoute<void>(builder: (_) => _TripImageShareScreen(plan: plan)),
+  return showShareCardSheet(
+    context,
+    title: 'Share trip',
+    card: _TripShareCard(plan: plan),
+    fileName: 'trip-${plan.id}.png',
+    shareText: '${plan.title} · planned with Tabi',
+    copyText: tripAsText(plan),
   );
 }
 
-class _TripImageShareScreen extends StatefulWidget {
-  const _TripImageShareScreen({required this.plan});
-
-  final TripPlan plan;
-
-  @override
-  State<_TripImageShareScreen> createState() => _TripImageShareScreenState();
-}
-
-class _TripImageShareScreenState extends State<_TripImageShareScreen> {
-  final _boundaryKey = GlobalKey();
-  bool _sharing = false;
-
-  Future<void> _share() async {
-    setState(() => _sharing = true);
-    final messenger = ScaffoldMessenger.of(context);
-    try {
-      final boundary =
-          _boundaryKey.currentContext!.findRenderObject()!
-              as RenderRepaintBoundary;
-      final image = await boundary.toImage(pixelRatio: 2.5);
-      final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
-      image.dispose();
-      if (bytes == null) throw StateError('Could not render the image.');
-
-      final dir = await getTemporaryDirectory();
-      final file = File(p.join(dir.path, 'trip-${widget.plan.id}.png'));
-      await file.writeAsBytes(bytes.buffer.asUint8List(), flush: true);
-
-      await SharePlus.instance.share(
-        ShareParams(
-          files: [XFile(file.path, mimeType: 'image/png')],
-          text: '${widget.plan.title} · planned with Tabi',
-          subject: widget.plan.title,
-        ),
-      );
-    } catch (_) {
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text('Could not create the image. Please try again.'),
-        ),
-      );
-    } finally {
-      if (mounted) setState(() => _sharing = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Share as image')),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
-        child: RepaintBoundary(
-          key: _boundaryKey,
-          child: _TripShareCard(plan: widget.plan),
-        ),
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _sharing ? null : _share,
-        backgroundColor: AppTheme.forest,
-        foregroundColor: Colors.white,
-        icon: _sharing
-            ? const SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: Colors.white,
-                ),
-              )
-            : const Icon(Icons.ios_share),
-        label: const Text('Share image'),
-      ),
-    );
-  }
-}
+/// Days drawn on the image; a longer trip says "+N more days".
+const shareCardMaxDays = 3;
 
 /// The itinerary laid out as one shareable card.
 class _TripShareCard extends StatelessWidget {
@@ -182,22 +108,19 @@ class _TripShareCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 6),
-                Text(
-                  '📍 ${plan.destination} · ${plan.daysCount} days · ${plan.companion.label}',
-                  style: const TextStyle(color: Colors.white70, fontSize: 13.5),
+                // Icons, not emoji: emoji look different on every phone.
+                _IconLine(
+                  icon: Icons.place_outlined,
+                  text:
+                      '${plan.destination} · ${plan.daysCount} days · '
+                      '${plan.companion.label}',
                 ),
                 if (plan.startDate != null)
-                  Text(
-                    '📅 ${_dateRange(plan)}',
-                    style: const TextStyle(
-                      color: Colors.white70,
-                      fontSize: 13.5,
-                    ),
-                  ),
+                  _IconLine(icon: Icons.event_outlined, text: _dateRange(plan)),
               ],
             ),
           ),
-          for (final day in plan.days)
+          for (final day in plan.days.take(shareCardMaxDays))
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
               child: Column(
@@ -242,14 +165,42 @@ class _TripShareCard extends StatelessWidget {
                       ),
                     ),
                   if (day.foodSuggestions.isNotEmpty)
-                    Text(
-                      '🍽️ ${day.foodSuggestions.take(3).join(' · ')}',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: AppTheme.inkMuted,
-                      ),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Padding(
+                          padding: EdgeInsets.only(top: 1, right: 6),
+                          child: Icon(
+                            Icons.restaurant_menu,
+                            size: 14,
+                            color: AppTheme.inkMuted,
+                          ),
+                        ),
+                        Expanded(
+                          child: Text(
+                            day.foodSuggestions.take(3).join(' · '),
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppTheme.inkMuted,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                 ],
+              ),
+            ),
+          if (plan.days.length > shareCardMaxDays)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+              child: Text(
+                '+${plan.days.length - shareCardMaxDays} more '
+                '${plan.days.length - shareCardMaxDays == 1 ? 'day' : 'days'}',
+                style: const TextStyle(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.inkMuted,
+                ),
               ),
             ),
           const Padding(
@@ -268,4 +219,29 @@ class _TripShareCard extends StatelessWidget {
       ),
     );
   }
+}
+
+/// A white line with an icon on the card's green header.
+class _IconLine extends StatelessWidget {
+  const _IconLine({required this.icon, required this.text});
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(top: 2),
+    child: Row(
+      children: [
+        Icon(icon, size: 15, color: Colors.white70),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            text,
+            style: const TextStyle(color: Colors.white70, fontSize: 13.5),
+          ),
+        ),
+      ],
+    ),
+  );
 }

@@ -121,7 +121,7 @@ void main() {
     );
 
     testWidgets(
-      'shows the journey by car and on foot, and where the trek starts',
+      'shows the journey by car and on foot; the trek rule is behind info',
       (tester) async {
         await pumpPlan(
           tester,
@@ -140,7 +140,14 @@ void main() {
         final card = _textOf(tester, find.byKey(const ValueKey('trip-plan')));
         expect(card, contains('By car | 5.30 km | ~14 min'));
         expect(card, contains('On foot | 4.60 km | ~58 min'));
-        expect(card, contains('Trek starts within 200 m of Sukhna Lake'));
+        // The trek rule is one tap away, not in the way.
+        expect(card, isNot(contains('Trek starts')));
+        await tester.tap(find.byTooltip('How trips are counted'));
+        await tester.pumpAndSettle();
+        expect(
+          find.textContaining('trek starts within 200 m of Sukhna Lake'),
+          findsOneWidget,
+        );
       },
     );
 

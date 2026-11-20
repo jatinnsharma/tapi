@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../social/data/social_repository.dart';
+import '../domain/plan_merge.dart';
 import '../domain/trip_plan.dart';
 
 final tripCloudRepositoryProvider = Provider<TripCloudRepository>((ref) {
@@ -14,8 +15,8 @@ final tripCloudRepositoryProvider = Provider<TripCloudRepository>((ref) {
 /// can add or remove members or delete the trip; a member can leave. See the
 /// `trip_plans` rule in firestore.rules.
 ///
-/// The whole plan is stored as one map and the newer `updatedAt` wins, so if
-/// two people edit the same trip at the same moment the last save is kept.
+/// The whole plan is stored as one map. Saves go through [saveMerged], which
+/// merges stop by stop with a friend's concurrent edit (see `mergePlans`).
 class TripCloudRepository {
   TripCloudRepository(this._firestore);
 
@@ -39,15 +40,42 @@ class TripCloudRepository {
         .handleError((Object _) {});
   }
 
-  Future<void> saveTrip(TripPlan plan) {
-    final cloudCopy = plan.copyWith(cloudSynced: true);
-    return _trips.doc(plan.id).set({
-      'ownerUid': plan.ownerUid,
-      'memberUids': plan.memberUids,
-      'updatedAt': plan.lastChanged.toIso8601String(),
-      'plan': cloudCopy.toJson(),
+  Future<void> saveTrip(TripPlan plan) =>
+      _trips.doc(plan.id).set(_docFor(plan));
+
+  /// Saves [plan], merged with whatever a friend saved since [base] (the
+  /// cloud copy this edit started from), in one transaction so neither
+  /// save is lost. Returns what was stored. With no [base], or no trip in
+  /// the cloud yet, [plan] is stored as it is. Needs a connection: Firestore
+  /// transactions don't run offline (the caller retries on the next sync).
+  Future<TripPlan> saveMerged(
+    TripPlan plan, {
+    TripPlan? base,
+    bool savedByOwner = false,
+  }) {
+    final ref = _trips.doc(plan.id);
+    return _firestore.runTransaction((tx) async {
+      final snapshot = await tx.get(ref);
+      final remote = snapshot.exists ? _fromDoc(snapshot.data()!) : null;
+      final toStore = remote == null || base == null
+          ? plan
+          : mergePlans(
+              base: base,
+              local: plan,
+              remote: remote,
+              savedByOwner: savedByOwner,
+            );
+      tx.set(ref, _docFor(toStore));
+      return toStore.copyWith(cloudSynced: true);
     });
   }
+
+  Map<String, dynamic> _docFor(TripPlan plan) => {
+    'ownerUid': plan.ownerUid,
+    'memberUids': plan.memberUids,
+    'updatedAt': plan.lastChanged.toIso8601String(),
+    'plan': plan.copyWith(cloudSynced: true).toJson(),
+  };
 
   Future<void> deleteTrip(String id) => _trips.doc(id).delete();
 

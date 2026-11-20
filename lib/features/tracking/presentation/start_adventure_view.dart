@@ -12,6 +12,7 @@ import '../domain/checkpoint.dart';
 import '../domain/directions.dart';
 import '../domain/trip_guard.dart';
 import '../domain/trip_split.dart';
+import '../../../core/config/xp_rules.dart';
 
 /// Before a trip: name it, see how it will count, and start.
 class StartAdventureView extends ConsumerStatefulWidget {
@@ -455,7 +456,7 @@ class _HowItCounts extends StatelessWidget {
           Icons.photo_camera_rounded,
           'Proof photo',
           'At $place, take a live photo to earn its '
-              '+${destination!.xpReward} XP.',
+              '+${clampPlaceXp(destination!.xpReward)} XP.',
         ),
       (
         Icons.flag_rounded,

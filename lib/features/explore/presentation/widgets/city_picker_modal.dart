@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../data/city_repository.dart';
 import '../../domain/city.dart';
+import '../city_detail_screen.dart' show prettyCityCategory;
 
 Future<City?> showCityPickerModal(BuildContext context, WidgetRef ref) {
   return showModalBottomSheet<City>(
@@ -175,7 +176,7 @@ class _CityPickerSheetState extends ConsumerState<_CityPickerSheet> {
                           ),
                         ),
                         subtitle: Text(
-                          '${city.state} · ${city.category.toUpperCase()}',
+                          '${city.state} · ${prettyCityCategory(city.category)}',
                           style: const TextStyle(
                             fontSize: 12,
                             color: AppTheme.inkMuted,

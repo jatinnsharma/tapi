@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/components.dart';
+import 'sample_data_banner.dart';
 import '../../../core/theme/glass.dart';
 import '../domain/guide.dart';
 
@@ -46,7 +47,10 @@ class GuidesScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Local Guides')),
+      appBar: AppBar(
+        title: const Text('Local Guides'),
+        bottom: const SampleDataBanner(),
+      ),
       body: ListView.builder(
         padding: AppSpacing.page,
         itemCount: _mockGuides.length,

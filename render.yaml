@@ -15,3 +15,5 @@ services:
         value: clone-2353a
       - key: MEDIA_SECRET
         generateValue: true
+      - key: GEMINI_API_KEY
+        sync: false # optional: paste a Gemini key to turn on the Sightseer Lens

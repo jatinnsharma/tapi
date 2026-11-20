@@ -33,7 +33,7 @@ Every trip is split in two (`trip_split.dart`, server copy `functions/lib/trip_s
 
 | # | How you earn | XP | Proof the app requires | Limits |
 |---|---|---|---|---|
-| 1 | **Reach a place** on a trip (Start from a place's sheet) | 60–110 by kind of place (shown on the place as "+N XP") | All of: (a) you started the trip **100 m or more** from it; (b) your recorded walk covers **at least 60%** of the straight-line distance; (c) **at least 60 s** into the trip; (d) your GPS shows **no fake or teleporting readings**; (e) you reach **within 40 m** of it; (f) you take a **photo with the live camera while you are there** (the gallery is not offered). The photo counts only if the last good GPS reading is **under 90 s old** and **within 100 m** of the place, and the photo itself is **under 2 minutes old** | A place pays XP **once every 7 days**. Revisits still count as visits, with 0 XP. Counts toward the **1,500 XP/day** trip cap |
+| 1 | **Reach a place** on a trip (Start from a place's sheet) | 50–110 by kind of place (shown on the place as "+N XP"; one table shared by the app and the server, `lib/core/config/xp_rules.dart`; any claim outside 50–110 is clamped) | All of: (a) you started the trip **100 m or more** from it; (b) your recorded walk covers **at least 60%** of the straight-line distance; (c) **at least 60 s** into the trip; (d) your GPS shows **no fake or teleporting readings**; (e) you reach **within 40 m** of it; (f) you take a **photo with the live camera while you are there** (the gallery is not offered). The photo counts only if the last good GPS reading is **under 90 s old** and **within 100 m** of the place, and the photo itself is **under 2 minutes old** | A place pays XP **once every 7 days**. Revisits still count as visits, with 0 XP. Counts toward the **1,500 XP/day** trip cap |
 | 2 | **Complete a trip** (press Finish) | +100 | Your **trek** (on foot, from within 200 m of the trek's start) was **at least 200 m** over **at least 2 minutes**, and the GPS was clean for the whole trip. The journey there doesn't count, however long | Counts toward the 1,500 XP/day cap. A trip that fails is saved as **"Trip not counted"**, earns nothing, and counts toward no achievement |
 | 3 | **Claim an achievement star** | 50 / 150 / 400 | The star's target is reached (section 2). You press **Claim** yourself | Each star pays once. Not part of the daily cap (it is limited by the targets) |
 
@@ -124,12 +124,17 @@ the app can only check it from the inside, so these remain possible:
   from the app (emulator-tested).
 - The app records fixes and sends them when a trip ends, behind
   `FeatureFlags.serverVerifiedXp` (**off**).
-- Tests: 62 for the function, 32 for the rules, 83 for the app.
+- With the flag on, the all-time leaderboard ranks by `verified_xp` only
+  (rows show a shield); the weekly ranking still uses the profile's
+  self-reported figure, since the server keeps no weekly totals.
+- `firebase.json` has the `functions` block `firebase deploy` needs.
 
 Still to do before it protects anything: deploy the function (Blaze plan,
-`firebase login`), publish the rules, turn the flag on, **then switch the
-leaderboard and achievements to read `verified_xp`** (they still use the
-profile's `totalXp`, which a modified app can inflate within the rate limit).
+`firebase login`, `firebase deploy --only functions,firestore:rules`) and turn
+`FeatureFlags.serverVerifiedXp` on. Then turn on App Check: it needs the
+`firebase_app_check` package in the app, Play Integrity set up in the
+console, and `enforceAppCheck: true` in `functions/index.js`. Turning on the
+function's check before the app sends App Check tokens rejects every trip.
 Be clear on what the server can and can't do: it can reject impossible paths
 and stop repeats, but it **cannot prove the GPS readings were true**. A faked
 path that looks like a plausible walk, with a live photo, still passes. That

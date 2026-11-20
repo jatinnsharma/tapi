@@ -26,6 +26,8 @@ import '../domain/trip_recorder.dart';
 import '../domain/trip_split.dart';
 import '../domain/trip_steps.dart';
 import 'server_xp_service.dart';
+import '../../../core/config/xp_rules.dart';
+import '../../social/application/leaderboard_service.dart';
 
 class TrackingState {
   const TrackingState({
@@ -333,11 +335,20 @@ class TrackingService extends Notifier<TrackingState> {
     }
   }
 
+  /// Live location is written at most this often (the group radar and
+  /// friends' map don't need more, and Firestore writes cost).
+  static const liveShareInterval = Duration(seconds: 5);
+  DateTime? _lastLiveShareAt;
+
   Future<void> _shareLocationBestEffort(
     LatLng point,
     AdventureSession session,
   ) async {
     if (!state.isSharingLocation) return;
+    final now = DateTime.now();
+    final last = _lastLiveShareAt;
+    if (last != null && now.difference(last) < liveShareInterval) return;
+    _lastLiveShareAt = now;
     try {
       if (!ref.read(firebaseReadyProvider)) return;
       final user = ref.read(authStateProvider).value;
@@ -507,7 +518,8 @@ class TrackingService extends Notifier<TrackingState> {
     final reason = 'Checkpoint reached: ${pending.name}';
     final startOfDay = DateTime(now.year, now.month, now.day);
 
-    var xp = pending.xpReward;
+    // Never more than any place can pay (see xp_rules.dart).
+    var xp = clampPlaceXp(pending.xpReward);
     String? note;
     if (await repository.hasXpReasonSince(
       reason,
@@ -675,9 +687,13 @@ class TrackingService extends Notifier<TrackingState> {
     try {
       if (!ref.read(firebaseReadyProvider)) return;
       if (ref.read(authStateProvider).value == null) return;
-      await ref
+      final verdict = await ref
           .read(serverXpServiceProvider)
           .submitTrip(recorder.payload(endedAt));
+      // The verified total changed: the leaderboard ranks by it.
+      if (verdict.ok && verdict.totalXp > 0) {
+        ref.invalidate(leaderboardProvider);
+      }
     } catch (_) {
       // Best-effort only.
     }

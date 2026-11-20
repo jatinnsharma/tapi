@@ -67,4 +67,24 @@ class LocationCommunityRepository {
   Future<void> deleteTip(String locationId, String tipId) {
     return _tips(locationId).doc(tipId).delete();
   }
+
+  /// Sends a tip to the moderators (the `reports` collection, reviewed in
+  /// the Firebase console), with enough to find and judge it.
+  Future<void> reportTip({
+    required String locationId,
+    required LocationTip tip,
+    required String reportedBy,
+    required String reason,
+  }) {
+    return _firestore.collection('reports').add({
+      'reportedUid': tip.uid,
+      'reportedBy': reportedBy,
+      'reason': reason,
+      'createdAt': DateTime.now().toIso8601String(),
+      'contentType': 'locationTip',
+      'locationId': locationId,
+      'tipId': tip.id,
+      'text': tip.text,
+    });
+  }
 }

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,6 +12,7 @@ import '../../core/services/ai_status.dart';
 import '../../core/services/location_service.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/components.dart';
+import '../../core/theme/app_components.dart';
 import '../ai/application/ai_places_service.dart';
 import '../auth/application/auth_service.dart';
 import '../social/data/social_repository.dart';
@@ -18,18 +20,26 @@ import 'application/fog_service.dart';
 import '../locations/data/location_community_repository.dart';
 import '../locations/data/location_repository.dart';
 import '../locations/domain/location.dart';
-import '../locations/domain/location_tip.dart';
-import '../locations/presentation/place_photo_gallery.dart';
 import '../locations/presentation/place_sheet.dart';
 import '../wishlist/application/wishlist_service.dart';
-import '../wishlist/data/wishlist_repository.dart';
 import '../wishlist/domain/wishlist_entry.dart';
 import '../tracking/data/adventure_repository.dart';
 import '../tracking/domain/route_point.dart';
 import '../social/domain/footprint.dart';
 import '../social/domain/friendship.dart';
-import 'cached_tile_provider.dart';
 import 'person_marker.dart';
+import 'map_pin.dart';
+import '../../core/config/memories_api.dart';
+import '../food/data/food_repository.dart';
+import '../memories/data/shared_memory_service.dart';
+import '../memories/domain/capsule_watch.dart';
+import '../memories/domain/shared_memory.dart';
+import '../memories/presentation/capsule_sheet.dart';
+import '../food/domain/food.dart';
+import '../food/presentation/food_spot_sheet.dart';
+import 'map_focus.dart';
+import 'osm_tiles.dart';
+import '../../core/ui/friendly_error.dart';
 
 enum MapMode {
   /// The default "fog of exploration" behavior: only discovered locations
@@ -49,31 +59,26 @@ enum MapMode {
 }
 
 extension on MapMode {
-  String get label {
-    switch (this) {
-      case MapMode.exploring:
-        return 'Exploring';
-      case MapMode.fullMap:
-        return 'Full map';
-      case MapMode.myPlaces:
-        return 'My places';
-      case MapMode.social:
-        return 'Social map';
-    }
-  }
+  String get label => switch (this) {
+    MapMode.exploring => 'Nearby',
+    MapMode.fullMap => 'Everything',
+    MapMode.myPlaces => 'Mine',
+    MapMode.social => 'Friends',
+  };
 
-  IconData get icon {
-    switch (this) {
-      case MapMode.exploring:
-        return Icons.visibility_off;
-      case MapMode.fullMap:
-        return Icons.visibility;
-      case MapMode.myPlaces:
-        return Icons.person_pin_circle;
-      case MapMode.social:
-        return Icons.group;
-    }
-  }
+  String get description => switch (this) {
+    MapMode.exploring => 'Places appear as you explore. Unknown ones stay hidden until you get close.',
+    MapMode.fullMap => 'Every place, for planning a trip anywhere.',
+    MapMode.myPlaces => 'Places you\'ve found or saved, and your routes.',
+    MapMode.social => 'Routes your friends chose to share.',
+  };
+
+  IconData get icon => switch (this) {
+    MapMode.exploring => Icons.explore_outlined,
+    MapMode.fullMap => Icons.public_rounded,
+    MapMode.myPlaces => Icons.bookmark_outline_rounded,
+    MapMode.social => Icons.group_outlined,
+  };
 }
 
 final completedPathsProvider =
@@ -123,10 +128,26 @@ class MapScreen extends ConsumerStatefulWidget {
 class _MapScreenState extends ConsumerState<MapScreen> {
   final MapController _mapController = MapController();
   StreamSubscription<LatLng>? _locationSubscription;
+  StreamSubscription<void>? _placesSubscription;
   LatLng? _currentLocation;
+
+  /// False while showing the default area because location is off.
+  bool _hasFix = false;
   List<ExploreLocation> _locations = [];
   bool _isLoading = true;
   bool _isGenerating = false;
+
+  /// Audio capsules around the user, and which were already announced.
+  List<SharedMemory> _capsules = const [];
+  final _announcedCapsules = <String>{};
+  DateTime? _capsulesFetchedAt;
+  LatLng? _capsulesFetchedWhere;
+  bool _fetchingCapsules = false;
+
+  /// The Food layer: real places to eat from OpenStreetMap.
+  bool _showFood = false;
+  bool _loadingFood = false;
+  List<FoodSpot> _foodSpots = const [];
   MapMode _mode = MapMode.exploring;
 
   @override
@@ -149,23 +170,114 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     if (!mounted) return;
     setState(() {
       _currentLocation = current;
+      _hasFix = location != null;
       _locations = revealed;
       _isLoading = false;
     });
     unawaited(_syncNewlyDiscoveredBestEffort(allLocations, revealed));
+    if (location != null) unawaited(_checkCapsules(location));
 
     _locationSubscription = locationService.getLocationStream().listen(
       _onLocationUpdate,
     );
+    // Places fetched elsewhere (a city's page, search, the planner) show up
+    // here without leaving the tab.
+    _placesSubscription = repository.changes.listen((_) => _reloadPlaces());
+
+    // "Explore on Map" may have been tapped before this tab first opened.
+    final pending = ref.read(mapFocusProvider);
+    if (pending != null) _applyFocus(pending);
+  }
+
+  Future<void> _reloadPlaces() async {
+    final current = _currentLocation;
+    if (current == null) return;
+    final all = await ref.read(locationRepositoryProvider).getAll();
+    final revealed = await ref
+        .read(fogServiceProvider)
+        .processPosition(current, all);
+    if (!mounted) return;
+    setState(() => _locations = revealed);
+  }
+
+  /// Shows [focus] (e.g. a city picked elsewhere): every place, fog off,
+  /// since it may be far from the user, and the map moved there.
+  void _applyFocus(MapFocus focus) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.read(mapFocusProvider.notifier).clear();
+      setState(() => _mode = MapMode.fullMap);
+      _mapController.move(focus.center, focus.zoom);
+    });
+  }
+
+  /// Fetches nearby capsules now and then, and announces one the user
+  /// walks up to (a buzz and a "Listen" prompt). Quietly does nothing when
+  /// signed out, offline or without a memories server.
+  Future<void> _checkCapsules(LatLng here) async {
+    if (memoriesApiUrl.isEmpty || !ref.read(firebaseReadyProvider)) return;
+    final user = ref.read(authStateProvider).value;
+    if (user == null) return;
+    final now = DateTime.now();
+    if (!_fetchingCapsules &&
+        shouldFetchCapsules(
+          now: now,
+          here: here,
+          lastAt: _capsulesFetchedAt,
+          lastWhere: _capsulesFetchedWhere,
+        )) {
+      _fetchingCapsules = true;
+      try {
+        final found = await ref
+            .read(sharedMemoryServiceProvider)
+            .nearbyCapsules(
+              uid: user.uid,
+              latitude: here.latitude,
+              longitude: here.longitude,
+            );
+        _capsulesFetchedAt = now;
+        _capsulesFetchedWhere = here;
+        if (mounted) setState(() => _capsules = found);
+      } catch (_) {
+        // Try again on a later update.
+      } finally {
+        _fetchingCapsules = false;
+      }
+    }
+    if (!mounted) return;
+    final reached = capsulesToAnnounce(
+      _capsules,
+      here,
+      announced: _announcedCapsules,
+    );
+    if (reached.isEmpty) return;
+    final capsule = reached.first;
+    _announcedCapsules.addAll(reached.map((c) => c.id));
+    HapticFeedback.mediumImpact();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        duration: const Duration(seconds: 8),
+        content: Text(
+          'Voice note here: '
+          '"${capsule.caption ?? 'A note'}" by ${capsule.displayName}',
+        ),
+        action: SnackBarAction(
+          label: 'Listen',
+          onPressed: () => showCapsuleSheet(context, capsule),
+        ),
+      ),
+    );
   }
 
   Future<void> _onLocationUpdate(LatLng position) async {
+    unawaited(_checkCapsules(position));
     final fogService = ref.read(fogServiceProvider);
     final previous = _locations;
     final revealed = await fogService.processPosition(position, previous);
     if (!mounted) return;
     setState(() {
       _currentLocation = position;
+      _hasFix = true;
       _locations = revealed;
     });
     unawaited(_syncNewlyDiscoveredBestEffort(previous, revealed));
@@ -177,7 +289,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     if (!aiReady) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('AI is not configured. Add GEMINI_API_KEY.'),
+          content: Text("AI suggestions aren't available in this version yet."),
         ),
       );
       return;
@@ -215,14 +327,21 @@ class _MapScreenState extends ConsumerState<MapScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Discovered ${newLocations.length} new places!'),
+          content: Text(
+            newLocations.isEmpty
+                ? 'No new places found near here.'
+                : 'Added ${newLocations.length} places nearby. '
+                      'Explore to reveal them.',
+          ),
         ),
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Failed to generate places: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Couldn\'t suggest places. ${friendlyError(e)}'),
+        ),
+      );
     } finally {
       if (mounted) setState(() => _isGenerating = false);
     }
@@ -253,23 +372,76 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     }
   }
 
-  @override
-  void dispose() {
-    _locationSubscription?.cancel();
-    super.dispose();
+  /// Turns the Food layer on (fetching around the map's centre) or off.
+  Future<void> _toggleFood() async {
+    if (_showFood) {
+      setState(() => _showFood = false);
+      return;
+    }
+    setState(() => _showFood = true);
+    await _loadFoodHere();
   }
 
-  void _centerOnUser() async {
-    final locationService = ref.read(locationServiceProvider);
-    final location = await locationService.getCurrentLocation();
-    if (location != null) {
-      setState(() => _currentLocation = location);
-      _mapController.move(location, 15.0);
+  Future<void> _loadFoodHere() async {
+    final center = _mapController.camera.center;
+    setState(() => _loadingFood = true);
+    try {
+      final spots = await ref
+          .read(foodRepositoryProvider)
+          .spotsNear(center.latitude, center.longitude);
+      if (!mounted) return;
+      setState(() => _foodSpots = spots);
+      if (spots.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No places to eat mapped near here.')),
+        );
+      }
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not load places to eat. Check your connection.'),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _loadingFood = false);
     }
   }
 
   @override
+  void dispose() {
+    _locationSubscription?.cancel();
+    _placesSubscription?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _centerOnUser() async {
+    final locationService = ref.read(locationServiceProvider);
+    var location = await locationService.getCurrentLocation();
+    if (location == null) {
+      await locationService.requestPermission();
+      location = await locationService.getCurrentLocation();
+    }
+    if (!mounted) return;
+    if (location == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Turn on location to see where you are.')),
+      );
+      return;
+    }
+    final here = location;
+    setState(() {
+      _currentLocation = here;
+      _hasFix = true;
+    });
+    _mapController.move(here, 15.0);
+  }
+
+  @override
   Widget build(BuildContext context) {
+    ref.listen<MapFocus?>(mapFocusProvider, (_, next) {
+      if (next != null && !_isLoading) _applyFocus(next);
+    });
     if (_isLoading) {
       return Scaffold(
         body: SafeArea(
@@ -281,11 +453,10 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 const Positioned.fill(
                   child: Shimmer(child: SkeletonBox(radius: 32)),
                 ),
-                MetaPill(
+                const Tag(
+                  'Finding your location…',
                   icon: Icons.my_location,
-                  label: 'Finding your location...',
-                  background: Colors.white.withValues(alpha: 0.92),
-                  foreground: AppTheme.forest,
+                  tone: TagTone.brand,
                 ),
               ],
             ),
@@ -333,79 +504,28 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         .where((l) => visitedIds.contains(l.id))
         .length;
 
+    final layersChanged = _mode != MapMode.exploring || _showFood;
     return Scaffold(
       appBar: AppBar(
-        title: Text(switch (_mode) {
-          MapMode.myPlaces => 'My Map',
-          MapMode.social => 'Social Map',
-          _ => 'Map',
-        }),
+        title: const Text('Map'),
         actions: [
           if (_isGenerating)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 6),
-              child: _MapCircle(
-                child: const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2.4,
-                    color: AppTheme.forest,
-                  ),
-                ),
-              ),
-            )
-          else
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 6),
-              child: RoundIconButton(
-                icon: Icons.auto_awesome,
-                size: 42,
-                tooltip: 'Discover Nearby Places with AI',
-                onPressed: _generateNearbyPlaces,
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 12),
+              child: SizedBox.square(
+                dimension: 20,
+                child: CircularProgressIndicator(strokeWidth: 2.4),
               ),
             ),
           Padding(
-            padding: const EdgeInsets.only(left: 6, right: 16),
-            child: PopupMenuButton<MapMode>(
-              tooltip: 'Map view',
-              initialValue: _mode,
-              color: Colors.white,
-              elevation: 8,
-              shadowColor: AppTheme.forest.withValues(alpha: 0.25),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-              ),
-              onSelected: (mode) => setState(() => _mode = mode),
-              itemBuilder: (context) => [
-                for (final mode in MapMode.values)
-                  PopupMenuItem(
-                    value: mode,
-                    child: Row(
-                      children: [
-                        Icon(
-                          mode.icon,
-                          size: 20,
-                          color: mode == _mode
-                              ? AppTheme.forest
-                              : AppTheme.inkMuted,
-                        ),
-                        const SizedBox(width: 12),
-                        Text(
-                          mode.label,
-                          style: TextStyle(
-                            color: AppTheme.ink,
-                            fontWeight: mode == _mode
-                                ? FontWeight.w800
-                                : FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-              ],
-              child: _MapCircle(
-                child: Icon(_mode.icon, color: AppTheme.forest, size: 21),
+            padding: const EdgeInsets.only(right: 8),
+            child: Badge(
+              isLabelVisible: layersChanged,
+              smallSize: 8,
+              child: AppButton.tertiary(
+                label: 'Layers',
+                icon: Icons.layers_outlined,
+                onPressed: _showLayers,
               ),
             ),
           ),
@@ -420,11 +540,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
               initialZoom: _currentLocation != null ? 14.0 : 12.0,
             ),
             children: [
-              TileLayer(
-                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                userAgentPackageName: 'com.example.real_world_exploration',
-                tileProvider: CachedTileProvider(),
-              ),
+              osmTileLayer(),
               if (_mode == MapMode.myPlaces)
                 Consumer(
                   builder: (context, ref, _) {
@@ -471,83 +587,124 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                   for (final location in visible)
                     Marker(
                       point: LatLng(location.latitude, location.longitude),
-                      width: 40,
-                      height: 40,
-                      child: GestureDetector(
-                        onTap: () => _showLocationSheet(location),
-                        child: _buildMarkerIcon(
-                          location,
-                          isWishlisted: wishlistedLocationIds.contains(
-                            location.id,
-                          ),
-                          isVisited: visitedIds.contains(location.id),
+                      width: MapPin.tapSize,
+                      height: MapPin.tapSize,
+                      child: _pinFor(
+                        location,
+                        visitedIds: visitedIds,
+                        isWishlisted: wishlistedLocationIds.contains(
+                          location.id,
                         ),
                       ),
                     ),
                 ],
               ),
+              if (_capsules.isNotEmpty)
+                MarkerLayer(
+                  markers: [
+                    for (final c in _capsules)
+                      if (c.latitude != null && c.longitude != null)
+                        Marker(
+                          point: LatLng(c.latitude!, c.longitude!),
+                          width: MapPin.tapSize,
+                          height: MapPin.tapSize,
+                          child: MapPin.voice(
+                            label: c.caption ?? 'A note',
+                            onTap: () => showCapsuleSheet(context, c),
+                          ),
+                        ),
+                  ],
+                ),
+              if (_showFood)
+                MarkerLayer(
+                  markers: [
+                    for (final spot in _foodSpots)
+                      Marker(
+                        point: LatLng(spot.latitude, spot.longitude),
+                        width: MapPin.tapSize,
+                        height: MapPin.tapSize,
+                        child: MapPin.food(
+                          label: spot.name,
+                          onTap: () => showFoodSpotSheet(context, spot),
+                        ),
+                      ),
+                  ],
+                ),
+              const OsmAttribution(),
             ],
           ),
-          Positioned(
-            top: 12,
-            left: 16,
-            child: IgnorePointer(
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.94),
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: Colors.white, width: 1.2),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppTheme.forest.withValues(alpha: 0.14),
-                      blurRadius: 14,
-                      offset: const Offset(0, 5),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(_mode.icon, size: 16, color: AppTheme.forest),
-                    const SizedBox(width: 6),
-                    Text(
-                      _mode.label,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w800,
-                        color: AppTheme.ink,
-                      ),
-                    ),
-                  ],
-                ),
+          if (!_hasFix)
+            Positioned(
+              top: 8,
+              left: 16,
+              right: 16,
+              child: StatusBanner(
+                kind: StatusKind.warning,
+                title: 'Location is off',
+                message:
+                    'Showing a default area. Turn on location to explore '
+                    'around you.',
+                actionLabel: 'Turn on',
+                onAction: _centerOnUser,
               ),
             ),
-          ),
-          if (visitedCount > 0)
+          if (_showFood)
+            Positioned(
+              bottom: 24,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: FilledButton.tonalIcon(
+                  onPressed: _loadingFood ? null : _loadFoodHere,
+                  icon: _loadingFood
+                      ? const SizedBox.square(
+                          dimension: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.search, size: 18),
+                  label: const Text('Search this area'),
+                ),
+              ),
+            )
+          else if (visitedCount > 0)
             Positioned(
               bottom: 28,
               left: 16,
               child: IgnorePointer(
-                child: MetaPill(
-                  icon: Icons.check_circle,
-                  label: '$visitedCount visited',
-                  background: Colors.white.withValues(alpha: 0.94),
-                  foreground: visitedColor,
+                child: Material(
+                  color: AppColors.of(context).surface,
+                  borderRadius: BorderRadius.circular(AppRadius.sm),
+                  elevation: 1,
+                  child: Tag(
+                    '$visitedCount visited',
+                    icon: Icons.check_circle_rounded,
+                    tone: TagTone.brand,
+                  ),
                 ),
               ),
             ),
           Positioned(
             bottom: 20,
-            right: 20,
-            child: RoundIconButton(
-              icon: Icons.my_location,
-              size: 54,
-              tooltip: 'Center on my location',
-              onPressed: _centerOnUser,
+            right: 16,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (_canLeaveVoiceNotes) ...[
+                  RoundIconButton(
+                    icon: Icons.mic_none_rounded,
+                    size: 48,
+                    tooltip: 'Leave a voice note here',
+                    onPressed: () => leaveAudioCapsule(context, ref),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                RoundIconButton(
+                  icon: Icons.my_location,
+                  size: 54,
+                  tooltip: 'Center on my location',
+                  onPressed: _centerOnUser,
+                ),
+              ],
             ),
           ),
         ],
@@ -555,389 +712,163 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     );
   }
 
-  /// Fill of the marker for places reached on a trip.
-  static const Color visitedColor = AppTheme.emerald;
+  /// Voice notes need sign-in and the memories server; otherwise the
+  /// button is hidden rather than failing on tap.
+  bool get _canLeaveVoiceNotes =>
+      memoriesApiUrl.isNotEmpty &&
+      ref.watch(firebaseReadyProvider) &&
+      ref.watch(authStateProvider).value != null;
 
-  Widget _buildMarkerIcon(
+  Widget _pinFor(
     ExploreLocation location, {
+    required Set<String> visitedIds,
     required bool isWishlisted,
-    required bool isVisited,
   }) {
-    if (isVisited) {
-      // Reached on a trip: a solid green disc with a gold tick, on every map
-      // mode, so visited places stand out from everything else.
-      return Stack(
-        alignment: Alignment.center,
-        children: [
-          Container(
-            width: 34,
-            height: 34,
-            decoration: BoxDecoration(
-              color: visitedColor,
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.white, width: 2),
-              boxShadow: [
-                BoxShadow(
-                  color: AppTheme.forest.withValues(alpha: 0.3),
-                  blurRadius: 6,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Icon(location.category.icon, color: Colors.white, size: 18),
-          ),
-          Positioned(
-            right: 0,
-            bottom: 0,
-            child: Container(
-              decoration: BoxDecoration(
-                color: AppTheme.amber,
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 1.2),
-              ),
-              padding: const EdgeInsets.all(2),
-              child: const Icon(Icons.check, size: 10, color: AppTheme.ink),
-            ),
-          ),
-        ],
+    void open() => _openPlace(location);
+    if (visitedIds.contains(location.id)) {
+      return MapPin.visited(
+        icon: location.category.icon,
+        label: location.nameFor(visitedIds),
+        onTap: open,
       );
     }
     if (location.isDiscovered) {
-      return Icon(
-        location.category.icon,
+      final hidden = location.isHiddenMystery(visitedIds);
+      return MapPin(
+        icon: hidden ? Icons.help_outline_rounded : location.category.icon,
         color: location.category.color,
-        size: 30,
+        label: location.nameFor(visitedIds),
+        onTap: open,
       );
     }
     if (_mode == MapMode.myPlaces && isWishlisted) {
-      return const Icon(Icons.bookmark, color: AppTheme.amber, size: 30);
+      return MapPin.saved(label: location.name, onTap: open);
     }
-    return Opacity(
-      opacity: 0.4,
-      child: Icon(Icons.help_outline, color: location.category.color, size: 30),
+    return MapPin.unknown(onTap: open);
+  }
+
+  /// Opens the shared place sheet. Places under the fog open as "Unknown
+  /// place", with no name, photos or saving.
+  void _openPlace(ExploreLocation location) {
+    final here = _currentLocation;
+    final km = _hasFix && here != null
+        ? const Distance().as(
+                LengthUnit.Meter,
+                here,
+                LatLng(location.latitude, location.longitude),
+              ) /
+              1000
+        : null;
+    showPlaceSheet(
+      context,
+      place: location,
+      distanceKm: km,
+      undiscovered: !location.isDiscovered,
     );
   }
 
-  void _showLocationSheet(ExploreLocation location) {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (context) => SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Photos only once discovered: undiscovered places stay hidden.
-            if (location.isDiscovered) ...[
-              PlacePhotoGallery(place: location, height: 180),
-              const SizedBox(height: 12),
-            ],
-            Row(
-              children: [
-                Icon(
-                  location.isDiscovered
-                      ? location.category.icon
-                      : Icons.help_outline,
-                  color: location.category.color,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    location.isDiscovered
-                        ? location.name
-                        : 'Undiscovered location',
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.3,
-                      color: AppTheme.ink,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            if (location.isDiscovered) ...[
-              Text(
-                location.description,
-                style: const TextStyle(color: AppTheme.inkMuted, height: 1.4),
-              ),
-              const SizedBox(height: 10),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
+  /// What the map shows, the Food layer, AI suggestions and the legend,
+  /// all in one sheet.
+  void _showLayers() {
+    final aiReady = ref.read(aiReadyProvider);
+    showAppSheet<void>(
+      context,
+      title: 'Map layers',
+      body: StatefulBuilder(
+        builder: (sheetContext, setSheetState) {
+          final text = Theme.of(sheetContext).textTheme;
+          final colors = AppColors.of(sheetContext);
+          final brand = Theme.of(sheetContext).colorScheme.primary;
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              AppListGroup(
+                title: 'SHOW',
                 children: [
-                  MetaPill(
-                    label: location.category.label,
-                    background: AppTheme.primaryGreen.withValues(alpha: 0.12),
-                    foreground: AppTheme.forest,
-                  ),
-                  MetaPill(
-                    icon: Icons.bolt_rounded,
-                    label: '+${location.xpReward} XP',
-                    background: AppTheme.amber,
-                    foreground: AppTheme.ink,
-                  ),
+                  for (final mode in MapMode.values)
+                    AppListTile(
+                      leading: Icon(mode.icon, color: brand),
+                      title: mode.label,
+                      subtitle: mode.description,
+                      trailing: mode == _mode
+                          ? Icon(
+                              Icons.check_rounded,
+                              color: brand,
+                              semanticLabel: 'Selected',
+                            )
+                          : null,
+                      onTap: () {
+                        setState(() => _mode = mode);
+                        setSheetState(() {});
+                      },
+                    ),
                 ],
               ),
-            ] else
-              const Text(
-                'Get closer to reveal this location.',
-                style: TextStyle(color: AppTheme.inkMuted),
+              AppListGroup(
+                title: 'EXTRAS',
+                children: [
+                  SwitchListTile(
+                    value: _showFood,
+                    title: const Text('Places to eat'),
+                    subtitle: const Text('From OpenStreetMap, around the map'),
+                    onChanged: (_) async {
+                      final toggle = _toggleFood();
+                      setSheetState(() {});
+                      await toggle;
+                    },
+                  ),
+                  if (aiReady)
+                    AppListTile(
+                      leading: Icon(Icons.auto_awesome_outlined, color: brand),
+                      title: 'Suggest more places',
+                      subtitle: 'Adds places near you to explore',
+                      onTap: _isGenerating
+                          ? null
+                          : () {
+                              Navigator.of(sheetContext).pop();
+                              _generateNearbyPlaces();
+                            },
+                    ),
+                ],
               ),
-            const SizedBox(height: 14),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                  // Undiscovered places stay unnamed until you get there.
-                  startTripToPlace(
-                    this.context,
-                    ref,
-                    location,
-                    displayName: location.isDiscovered
-                        ? null
-                        : 'Undiscovered location',
-                  );
-                },
-                icon: const Icon(Icons.play_arrow_rounded),
-                label: Text(location.isDiscovered ? 'Start' : 'Guide me there'),
-                style: FilledButton.styleFrom(
-                  shape: const StadiumBorder(),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(4, 16, 4, 8),
+                child: Text(
+                  'WHAT THE PINS MEAN',
+                  style: text.labelMedium?.copyWith(
+                    color: colors.textSecondary,
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 10),
-            Consumer(
-              builder: (context, ref, _) {
-                final keysAsync = ref.watch(wishlistKeysProvider);
-                final saved = keysAsync.maybeWhen(
-                  data: (keys) =>
-                      isWishlisted(keys, WishlistType.location, location.id),
-                  orElse: () => false,
-                );
-                return OutlinedButton.icon(
-                  style: OutlinedButton.styleFrom(
-                    shape: const StadiumBorder(),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 12,
-                    ),
+              for (final (pin, meaning) in [
+                (
+                  MapPin.visited(icon: Icons.place_rounded, label: 'Example'),
+                  'You\'ve been here',
+                ),
+                (
+                  const MapPin(
+                    icon: Icons.place_rounded,
+                    color: AppTheme.primaryGreen,
+                    label: 'Example',
                   ),
-                  onPressed: () async {
-                    await ref
-                        .read(wishlistRepositoryProvider)
-                        .toggle(WishlistType.location, location.id);
-                    ref.invalidate(wishlistKeysProvider);
-                  },
-                  icon: Icon(saved ? Icons.bookmark : Icons.bookmark_outline),
-                  label: Text(saved ? 'Saved to wishlist' : 'Save to wishlist'),
-                );
-              },
-            ),
-            if (location.isDiscovered) ...[
-              const SizedBox(height: 16),
-              const Divider(),
-              _LocationCommunitySection(location: location),
+                  'Found nearby, not visited yet',
+                ),
+                (MapPin.saved(label: 'Example'), 'Saved to your wishlist'),
+                (MapPin.unknown(), 'Unknown: get closer to reveal it'),
+                (MapPin.food(label: 'Example'), 'Place to eat'),
+                (MapPin.voice(label: 'Example'), 'Voice note left here'),
+              ])
+                Row(
+                  children: [
+                    ExcludeSemantics(child: pin),
+                    const SizedBox(width: 12),
+                    Expanded(child: Text(meaning, style: text.bodyMedium)),
+                  ],
+                ),
             ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _LocationCommunitySection extends ConsumerStatefulWidget {
-  const _LocationCommunitySection({required this.location});
-
-  final ExploreLocation location;
-
-  @override
-  ConsumerState<_LocationCommunitySection> createState() =>
-      _LocationCommunitySectionState();
-}
-
-class _LocationCommunitySectionState
-    extends ConsumerState<_LocationCommunitySection> {
-  late Future<(int, List<LocationTip>)> _future;
-
-  @override
-  void initState() {
-    super.initState();
-    _future = _load();
-  }
-
-  Future<(int, List<LocationTip>)> _load() async {
-    final repository = ref.read(locationCommunityRepositoryProvider);
-    final count = await repository.getExplorerCount(widget.location.id);
-    final tips = await repository.getTips(widget.location.id);
-    return (count, tips);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final firebaseReady = ref.watch(firebaseReadyProvider);
-    if (!firebaseReady) return const SizedBox.shrink();
-
-    return FutureBuilder<(int, List<LocationTip>)>(
-      future: _future,
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) {
-          return const Padding(
-            padding: EdgeInsets.symmetric(vertical: 8.0),
-            child: Shimmer(child: SkeletonBox(height: 44, radius: 16)),
           );
-        }
-        final (count, tips) = snapshot.data!;
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(
-                  Icons.people_outline,
-                  size: 18,
-                  color: AppTheme.forest,
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  '$count explorer${count == 1 ? '' : 's'}',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w700,
-                    color: AppTheme.ink,
-                  ),
-                ),
-                const Spacer(),
-                TextButton.icon(
-                  onPressed: () => _showAddTipDialog(context),
-                  icon: const Icon(Icons.add_comment_outlined, size: 18),
-                  label: const Text('Add Tip'),
-                ),
-              ],
-            ),
-            if (tips.isNotEmpty) ...[
-              const SizedBox(height: 4),
-              for (final tip in tips.take(5))
-                Container(
-                  width: double.infinity,
-                  margin: const EdgeInsets.symmetric(vertical: 4.0),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 10,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppTheme.primaryGreen.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Text.rich(
-                    TextSpan(
-                      children: [
-                        TextSpan(
-                          text: '${tip.displayName}: ',
-                          style: const TextStyle(fontWeight: FontWeight.w800),
-                        ),
-                        TextSpan(text: tip.text),
-                      ],
-                    ),
-                    style: const TextStyle(color: AppTheme.ink, height: 1.35),
-                  ),
-                ),
-            ],
-          ],
-        );
-      },
-    );
-  }
-
-  void _showAddTipDialog(BuildContext context) {
-    final user = ref.read(authStateProvider).value;
-    if (user == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Sign in to share a tip.')));
-      return;
-    }
-
-    final textController = TextEditingController();
-    showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Share a Tip'),
-        content: TextField(
-          controller: textController,
-          decoration: const InputDecoration(
-            hintText: 'e.g. Best visited at sunrise',
-          ),
-          maxLines: 3,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(shape: const StadiumBorder()),
-            onPressed: () async {
-              if (textController.text.trim().isEmpty) return;
-              final profile = await ref
-                  .read(socialRepositoryProvider)
-                  .getProfile(user.uid);
-              await ref
-                  .read(locationCommunityRepositoryProvider)
-                  .postTip(
-                    widget.location.id,
-                    LocationTip(
-                      id: '',
-                      uid: user.uid,
-                      displayName:
-                          profile?.displayName ??
-                          user.email?.split('@').first ??
-                          'Explorer',
-                      text: textController.text.trim(),
-                      timestamp: DateTime.now(),
-                    ),
-                  );
-              if (context.mounted) Navigator.of(context).pop();
-              setState(() => _future = _load());
-            },
-            child: const Text('Post'),
-          ),
-        ],
+        },
       ),
-    );
-  }
-}
-
-/// Round white surface matching [RoundIconButton], for app bar actions that
-/// need a custom child (spinner, popup menu trigger).
-class _MapCircle extends StatelessWidget {
-  const _MapCircle({required this.child});
-
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 42,
-      height: 42,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: Colors.white.withValues(alpha: 0.92),
-        border: Border.all(color: Colors.white, width: 1.2),
-        boxShadow: [
-          BoxShadow(
-            color: AppTheme.forest.withValues(alpha: 0.12),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: child,
     );
   }
 }

@@ -81,20 +81,14 @@ class AppAvatar extends StatelessWidget {
           color: Colors.white.withValues(alpha: 0.7),
           width: 2,
         ),
-        boxShadow: [
-          BoxShadow(
-            color: AppTheme.forest.withValues(alpha: 0.25),
-            blurRadius: 14,
-            offset: const Offset(0, 6),
-          ),
-        ],
+        boxShadow: AppElevation.level0,
       ),
       child: Text(
         initial.isEmpty ? '?' : initial.substring(0, 1).toUpperCase(),
         style: TextStyle(
           color: Colors.white,
           fontSize: size * 0.4,
-          fontWeight: FontWeight.w800,
+          fontWeight: FontWeight.w700,
         ),
       ),
     );
@@ -113,7 +107,7 @@ class HeroCard extends StatelessWidget {
     required this.child,
     this.padding = const EdgeInsets.all(20),
     this.minHeight = 0,
-    this.radius = 32,
+    this.radius = AppRadius.lg,
     this.onTap,
   });
 
@@ -129,13 +123,7 @@ class HeroCard extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: borderRadius,
-        boxShadow: [
-          BoxShadow(
-            color: AppTheme.forest.withValues(alpha: 0.32),
-            blurRadius: 30,
-            offset: const Offset(0, 14),
-          ),
-        ],
+        boxShadow: AppElevation.level0,
       ),
       child: ClipRRect(
         borderRadius: borderRadius,
@@ -200,6 +188,13 @@ class MetaPill extends StatelessWidget {
     this.foreground = Colors.white,
   });
 
+  /// A pill for light surfaces (cards, page backgrounds): dark text on a
+  /// brand tint. The default constructor is for dark surfaces and photos,
+  /// where its white text would be invisible on light ones.
+  const MetaPill.onLight({super.key, required this.label, this.icon})
+    : background = const Color(0x1F237A4B), // primaryGreen at 12 %.
+      foreground = AppTheme.forest;
+
   final String label;
   final IconData? icon;
 
@@ -256,13 +251,7 @@ class AmberPillButton extends StatelessWidget {
         decoration: BoxDecoration(
           color: AppTheme.amber,
           borderRadius: BorderRadius.circular(30),
-          boxShadow: [
-            BoxShadow(
-              color: AppTheme.amber.withValues(alpha: 0.5),
-              blurRadius: 22,
-              offset: const Offset(0, 8),
-            ),
-          ],
+          boxShadow: AppElevation.level0,
         ),
         child: Material(
           type: MaterialType.transparency,
@@ -283,7 +272,7 @@ class AmberPillButton extends StatelessWidget {
                     style: const TextStyle(
                       color: AppTheme.ink,
                       fontSize: 16,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                 ],
@@ -308,7 +297,7 @@ class RoundIconButton extends StatelessWidget {
     required this.onPressed,
     this.tooltip,
     this.showDot = false,
-    this.size = 46,
+    this.size = 48,
   });
 
   final IconData icon;
@@ -325,13 +314,7 @@ class RoundIconButton extends StatelessWidget {
           shape: BoxShape.circle,
           color: Colors.white.withValues(alpha: 0.92),
           border: Border.all(color: Colors.white, width: 1.2),
-          boxShadow: [
-            BoxShadow(
-              color: AppTheme.forest.withValues(alpha: 0.12),
-              blurRadius: 16,
-              offset: const Offset(0, 6),
-            ),
-          ],
+          boxShadow: AppElevation.level0,
         ),
         child: Material(
           type: MaterialType.transparency,
@@ -400,13 +383,7 @@ class CategoryChip extends StatelessWidget {
             color: selected ? AppTheme.forest : Colors.white,
             width: 1.4,
           ),
-          boxShadow: [
-            BoxShadow(
-              color: AppTheme.forest.withValues(alpha: selected ? 0.3 : 0.08),
-              blurRadius: selected ? 16 : 10,
-              offset: const Offset(0, 6),
-            ),
-          ],
+          boxShadow: AppElevation.level0,
         ),
         child: Material(
           type: MaterialType.transparency,
@@ -458,29 +435,17 @@ class SectionHeader extends StatelessWidget {
               title,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 21,
-                fontWeight: FontWeight.w800,
-                letterSpacing: -0.3,
-                color: AppTheme.ink,
-              ),
+              style: Theme.of(context).textTheme.titleLarge,
             ),
           ),
           if (actionLabel != null)
-            InkWell(
-              borderRadius: BorderRadius.circular(8),
-              onTap: onAction,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-                child: Text(
-                  actionLabel!,
-                  style: const TextStyle(
-                    color: AppTheme.amberText,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 15,
-                  ),
-                ),
+            // A real button: 48 px tall, so it's easy to hit.
+            TextButton(
+              onPressed: onAction,
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
               ),
+              child: Text(actionLabel!),
             ),
         ],
       ),
@@ -499,7 +464,7 @@ class SoftCard extends StatelessWidget {
     required this.child,
     this.padding = const EdgeInsets.all(16),
     this.margin = EdgeInsets.zero,
-    this.radius = 24,
+    this.radius = AppRadius.md,
     this.onTap,
   });
 
@@ -511,21 +476,15 @@ class SoftCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = AppColors.of(context);
     final borderRadius = BorderRadius.circular(radius);
     return Padding(
       padding: margin,
       child: DecoratedBox(
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.96),
+          color: colors.surface,
           borderRadius: borderRadius,
-          border: Border.all(color: Colors.white, width: 1.2),
-          boxShadow: [
-            BoxShadow(
-              color: AppTheme.forest.withValues(alpha: 0.10),
-              blurRadius: 22,
-              offset: const Offset(0, 8),
-            ),
-          ],
+          border: Border.all(color: colors.border),
         ),
         child: Material(
           type: MaterialType.transparency,
@@ -570,7 +529,7 @@ class PlaceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final borderRadius = BorderRadius.circular(26);
+    final borderRadius = BorderRadius.circular(AppRadius.lg);
     final url = imageUrl;
     return PressableScale(
       child: SizedBox(
@@ -579,13 +538,7 @@ class PlaceCard extends StatelessWidget {
         child: DecoratedBox(
           decoration: BoxDecoration(
             borderRadius: borderRadius,
-            boxShadow: [
-              BoxShadow(
-                color: gradient.last.withValues(alpha: 0.35),
-                blurRadius: 22,
-                offset: const Offset(0, 10),
-              ),
-            ],
+            boxShadow: AppElevation.level0,
           ),
           child: ClipRRect(
             borderRadius: borderRadius,
@@ -639,7 +592,7 @@ class PlaceCard extends StatelessWidget {
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 17,
-                              fontWeight: FontWeight.w800,
+                              fontWeight: FontWeight.w700,
                               height: 1.15,
                               letterSpacing: -0.2,
                             ),
@@ -709,7 +662,7 @@ class StatTile extends StatelessWidget {
               value,
               style: const TextStyle(
                 fontSize: 24,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w700,
                 letterSpacing: -0.4,
                 color: AppTheme.ink,
               ),
@@ -777,7 +730,7 @@ class EmptyStateCard extends StatelessWidget {
                   title,
                   style: const TextStyle(
                     fontSize: 16,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w700,
                     color: AppTheme.ink,
                   ),
                 ),
@@ -957,22 +910,17 @@ class FloatingNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = AppColors.of(context);
     return SafeArea(
       top: false,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(14, 4, 14, 12),
         child: DecoratedBox(
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.94),
+            color: colors.surface.withValues(alpha: 0.96),
             borderRadius: BorderRadius.circular(36),
-            border: Border.all(color: Colors.white, width: 1.4),
-            boxShadow: [
-              BoxShadow(
-                color: AppTheme.forest.withValues(alpha: 0.18),
-                blurRadius: 30,
-                offset: const Offset(0, 10),
-              ),
-            ],
+            border: Border.all(color: colors.border),
+            boxShadow: AppElevation.level1,
           ),
           child: Padding(
             padding: const EdgeInsets.all(6),
@@ -1008,32 +956,34 @@ class _NavButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = selected ? Colors.white : AppTheme.inkMuted;
+    final colors = AppColors.of(context);
+    final color = selected
+        ? Theme.of(context).colorScheme.onPrimary
+        : colors.textSecondary;
     return Semantics(
       button: true,
       selected: selected,
-      label: item.label,
+      // Said once: the visible text under the icon would repeat it.
+      label: item.badgeCount > 0
+          ? '${item.label}, ${item.badgeCount} new'
+          : item.label,
+      excludeSemantics: true,
+      onTap: onTap,
       child: Material(
         type: MaterialType.transparency,
         child: InkWell(
           borderRadius: BorderRadius.circular(30),
           onTap: onTap,
           child: AnimatedContainer(
-            duration: const Duration(milliseconds: 260),
-            curve: Curves.easeOutCubic,
+            duration: MediaQuery.disableAnimationsOf(context)
+                ? Duration.zero
+                : AppMotion.base,
+            curve: AppMotion.curve,
             padding: const EdgeInsets.symmetric(vertical: 10),
             decoration: BoxDecoration(
               color: selected ? AppTheme.forest : Colors.transparent,
               borderRadius: BorderRadius.circular(30),
-              boxShadow: selected
-                  ? [
-                      BoxShadow(
-                        color: AppTheme.forest.withValues(alpha: 0.35),
-                        blurRadius: 14,
-                        offset: const Offset(0, 6),
-                      ),
-                    ]
-                  : const [],
+              boxShadow: AppElevation.level0,
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -1059,16 +1009,16 @@ class _NavButton extends StatelessWidget {
                           decoration: BoxDecoration(
                             color: AppTheme.amber,
                             borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: Colors.white, width: 1.5),
+                            border: Border.all(
+                              color: colors.surface,
+                              width: 1.5,
+                            ),
                           ),
                           child: Text(
                             '${item.badgeCount}',
                             textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              fontSize: 10.5,
-                              fontWeight: FontWeight.w800,
-                              color: AppTheme.ink,
-                            ),
+                            style: Theme.of(context).textTheme.labelMedium
+                                ?.copyWith(color: AppTheme.ink),
                           ),
                         ),
                       ),
@@ -1078,9 +1028,8 @@ class _NavButton extends StatelessWidget {
                 Text(
                   item.label,
                   maxLines: 1,
-                  style: TextStyle(
-                    fontSize: 11.5,
-                    fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
                     color: color,
                   ),
                 ),

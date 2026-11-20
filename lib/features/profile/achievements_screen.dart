@@ -6,7 +6,7 @@ import '../../core/theme/components.dart';
 import '../../core/theme/glass.dart';
 import 'application/achievement_service.dart';
 import 'domain/achievement.dart';
-import 'rank_rewards_card.dart';
+import '../../core/ui/friendly_error.dart';
 
 const _bronze = Color(0xFFCD7F32);
 const _silver = Color(0xFF9EA7B0);
@@ -45,7 +45,7 @@ class AchievementsScreen extends ConsumerWidget {
             EmptyStateCard(
               icon: Icons.cloud_off_rounded,
               title: 'Could not load achievements',
-              message: '$error',
+              message: friendlyError(error),
               actionLabel: 'Try again',
               onAction: () => ref.invalidate(achievementsProvider),
             ),
@@ -109,8 +109,6 @@ class AchievementsScreen extends ConsumerWidget {
                   ),
                 ),
                 const SizedBox(height: 14),
-                const RankRewardsCard(),
-                const SizedBox(height: 14),
                 for (final progress in sorted)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 12),
@@ -153,7 +151,9 @@ class _AchievementCardState extends ConsumerState<_AchievementCard> {
         );
       }
     } catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text('Could not claim: $e')));
+      messenger.showSnackBar(
+        SnackBar(content: Text('Could not claim. ${friendlyError(e)}')),
+      );
     } finally {
       if (mounted) setState(() => _claiming = false);
     }
@@ -394,7 +394,7 @@ class _RewardDialog extends StatelessWidget {
             shape: const StadiumBorder(),
             padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 12),
           ),
-          child: const Text('Awesome!'),
+          child: const Text('Continue'),
         ),
       ],
     );

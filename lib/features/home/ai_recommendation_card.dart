@@ -9,6 +9,7 @@ import '../ai/application/ai_places_service.dart';
 import '../locations/domain/location.dart';
 import '../locations/presentation/place_sheet.dart';
 import '../preferences/application/preferences_service.dart';
+import '../../core/ui/friendly_error.dart';
 
 class AiRecommendationCard extends ConsumerStatefulWidget {
   const AiRecommendationCard({super.key, required this.nearbyLocations});
@@ -49,7 +50,7 @@ class _AiRecommendationCardState extends ConsumerState<AiRecommendationCard> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _error = e.toString();
+          _error = friendlyError(e);
           _isLoading = false;
         });
       }
